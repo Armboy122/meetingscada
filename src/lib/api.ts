@@ -1,7 +1,10 @@
 import type { APIResponse, MeetingRoom, Booking, BookingFormData, ApprovalData, Admin } from '../types';
-import type { HistoryItem, HistoryResponse, HistorySummary } from '../types/history';
+import type { HistoryResponse, HistorySummary, BookingHistoryResponse } from '../types/history';
 
-const API_BASE_URL = '/api';
+// Global variable defined in vite.config.ts
+declare const __API_BASE_URL__: string;
+
+const API_BASE_URL = __API_BASE_URL__;
 
 class APIClient {
   private baseURL: string;
@@ -25,7 +28,18 @@ class APIClient {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      
+      try {
+        const errorData = await response.json();
+        if (errorData && errorData.message) {
+          errorMessage = errorData.message;
+        }
+      } catch {
+        // Fall back to generic error message if JSON parsing fails
+      }
+      
+      throw new Error(errorMessage);
     }
 
     return response.json();
@@ -153,8 +167,8 @@ class APIClient {
   }
 
   // History API
-  async getBookingHistory(id: number): Promise<APIResponse<HistoryItem[]>> {
-    return this.request<HistoryItem[]>(`/bookings/${id}/history`);
+  async getBookingHistory(id: number): Promise<APIResponse<BookingHistoryResponse>> {
+    return this.request<BookingHistoryResponse>(`/bookings/${id}/history`);
   }
 
   async getHistory(params?: {

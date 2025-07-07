@@ -67,3 +67,62 @@ export default tseslint.config([
   },
 ])
 ```
+
+# Meeting Room Frontend
+
+## 🚀 Development Setup
+
+### API Configuration
+
+โปรเจคนี้ใช้ API URL ที่ต่างกันระหว่าง development และ production:
+
+- **Development**: `/api` (proxy ไปที่ `localhost:8787`)
+- **Production**: `https://your-app.workers.dev`
+
+### Environment Variables
+
+สร้างไฟล์ `.env` ในโฟลเดอร์ `meeting-room-frontend/`:
+
+```bash
+# Development (ใช้ proxy)
+VITE_API_BASE_URL=/api
+
+# Production (ใช้ Cloudflare Workers URL จริง)
+# VITE_API_BASE_URL=https://your-app.workers.dev
+```
+
+### การรันโปรเจค
+
+```bash
+# Development
+npm run dev
+
+# Build สำหรับ production
+npm run build
+
+# Preview build
+npm run preview
+```
+
+### 🔧 Configuration Files
+
+- `vite.config.ts`: ตั้งค่า proxy สำหรับ development
+- `src/lib/api.ts`: API client ที่ใช้ environment variables
+
+### 📝 วิธีการ Deploy
+
+1. แก้ไข URL ใน `vite.config.ts`:
+```typescript
+define: {
+  __API_BASE_URL__: JSON.stringify(
+    mode === 'development' ? '/api' : 'https://your-actual-workers-url.workers.dev'
+  ),
+},
+```
+
+2. Build project:
+```bash
+npm run build
+```
+
+3. Deploy ไฟล์ใน `dist/` folder

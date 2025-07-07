@@ -6,7 +6,7 @@ export function useBookingHistory(id: number) {
     queryKey: ['booking-history', id],
     queryFn: async () => {
       const response = await apiClient.getBookingHistory(id);
-      return response.data || [];
+      return response.data;
     },
     enabled: !!id,
     staleTime: 2 * 60 * 1000, // 2 minutes

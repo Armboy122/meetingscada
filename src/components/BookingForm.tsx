@@ -19,6 +19,7 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
   const { data: rooms = [] } = useRooms();
   const createBooking = useCreateBooking();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   
   // ดึงข้อมูลการจองสำหรับห้องที่เลือก
   const { data: existingBookings = [] } = useBookings({ roomId: selectedRoomId });
@@ -93,6 +94,7 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
 
   const onSubmit = async (data: BookingFormData) => {
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
       await createBooking.mutateAsync(data);
       onSuccess();
@@ -100,6 +102,7 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
       onClose();
     } catch (error) {
       console.error('Error creating booking:', error);
+      setSubmitError(error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการจอง');
     } finally {
       setIsSubmitting(false);
     }
@@ -121,6 +124,12 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {submitError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-600">{submitError}</p>
+            </div>
+          )}
+          
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               วันที่จอง
