@@ -1,4 +1,4 @@
-import type { APIResponse, MeetingRoom, Booking, BookingFormData, ApprovalData } from '../types';
+import type { APIResponse, MeetingRoom, Booking, BookingFormData, ApprovalData, Admin } from '../types';
 import type { HistoryItem, HistoryResponse, HistorySummary } from '../types/history';
 
 const API_BASE_URL = '/api';
@@ -31,6 +31,11 @@ class APIClient {
     return response.json();
   }
 
+  // Health Check API
+  async healthCheck(): Promise<APIResponse<{ version: string; timestamp: string }>> {
+    return this.request<{ version: string; timestamp: string }>('/');
+  }
+
   // Rooms API
   async getRooms(): Promise<APIResponse<MeetingRoom[]>> {
     return this.request<MeetingRoom[]>('/rooms');
@@ -38,6 +43,26 @@ class APIClient {
 
   async getRoom(id: number): Promise<APIResponse<MeetingRoom>> {
     return this.request<MeetingRoom>(`/rooms/${id}`);
+  }
+
+  async createRoom(data: { roomName: string; capacity: number }): Promise<APIResponse<MeetingRoom>> {
+    return this.request<MeetingRoom>('/rooms', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateRoom(id: number, data: { roomName: string; capacity: number; isActive: boolean }): Promise<APIResponse<MeetingRoom>> {
+    return this.request<MeetingRoom>(`/rooms/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteRoom(id: number): Promise<APIResponse<void>> {
+    return this.request<void>(`/rooms/${id}`, {
+      method: 'DELETE',
+    });
   }
 
   // Bookings API
@@ -98,9 +123,38 @@ class APIClient {
     return this.request<Booking>(`/bookings/${id}/status`);
   }
 
+  // Admins API
+  async getAdmins(): Promise<APIResponse<Admin[]>> {
+    return this.request<Admin[]>('/admins');
+  }
+
+  async getAdmin(id: number): Promise<APIResponse<Admin>> {
+    return this.request<Admin>(`/admins/${id}`);
+  }
+
+  async createAdmin(data: { username: string; passwordHash: string; fullName: string; email: string }): Promise<APIResponse<Admin>> {
+    return this.request<Admin>('/admins', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateAdmin(id: number, data: { username: string; fullName: string; email: string; isActive: boolean }): Promise<APIResponse<Admin>> {
+    return this.request<Admin>(`/admins/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteAdmin(id: number): Promise<APIResponse<void>> {
+    return this.request<void>(`/admins/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // History API
   async getBookingHistory(id: number): Promise<APIResponse<HistoryItem[]>> {
-    return this.request<HistoryItem[]>(`/${id}/history`);
+    return this.request<HistoryItem[]>(`/bookings/${id}/history`);
   }
 
   async getHistory(params?: {
