@@ -7,8 +7,8 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        // target: 'http://localhost:8787',
-        target: 'https://cfw-bun-hono-drizzle.apiarm.workers.dev',
+        // target: 'http://localhost:8787',  // ใช้ตอนรัน backend locally
+        target: 'https://cfw-bun-hono-drizzle.apiarm.workers.dev',  // ใช้ production API
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
