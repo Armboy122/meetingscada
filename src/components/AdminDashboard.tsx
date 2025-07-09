@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Check, X, Edit, Eye, Trash2, Building, BarChart3, Users, Key } from 'lucide-react';
+import { ArrowLeft, Check, X, Edit, Eye, Trash2, Building, Users, Key } from 'lucide-react';
 import { useBookings, useApproveBooking, useRejectBooking, useUpdateBooking, useDeleteBooking } from '../hooks/useBookings';
 import { useAuth } from '../contexts/AuthContext';
 import { EditBookingModal } from './EditBookingModal';
@@ -10,13 +10,13 @@ import type { Booking, BookingFormData } from '../types';
 // Import new components
 import { RoomManagement } from './RoomManagement';
 import { AdminManagement } from './AdminManagement';
-import { HistoryReports } from './HistoryReports';
+// import { HistoryReports } from './HistoryReports'; // ปิดไว้ก่อน - API ยังไม่พร้อม
 
 interface AdminDashboardProps {
   onBack: () => void;
 }
 
-type AdminTab = 'bookings' | 'rooms' | 'admins' | 'reports';
+type AdminTab = 'bookings' | 'rooms' | 'admins'; // | 'reports'; // ปิดไว้ก่อน - API ยังไม่พร้อม
 
 export function AdminDashboard({ onBack }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('bookings');
@@ -149,7 +149,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
     { key: 'bookings', label: 'จัดการการจอง', icon: Check, count: allBookings.filter(b => b.status === 'pending').length },
     { key: 'rooms', label: 'จัดการห้องประชุม', icon: Building },
     ...(isSuperAdmin ? [{ key: 'admins', label: 'จัดการผู้ดูแล', icon: Users }] : []),
-    { key: 'reports', label: 'รายงานและประวัติ', icon: BarChart3 },
+    // { key: 'reports', label: 'รายงานและประวัติ', icon: BarChart3 }, // ปิดไว้ก่อน - API ยังไม่พร้อม
   ];
 
   return (
@@ -395,6 +395,8 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                           </button>
                         </>
                       )}
+
+
                     </div>
                   </div>
                 ))}
@@ -517,6 +519,8 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                                 </button>
                               </>
                             )}
+
+
                           </div>
                         </td>
                       </tr>
@@ -542,7 +546,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
             <p className="text-red-600">เฉพาะ Super Admin เท่านั้นที่สามารถจัดการผู้ดูแลระบบได้</p>
           </div>
         )}
-        {activeTab === 'reports' && <HistoryReports />}
+        {/* {activeTab === 'reports' && <HistoryReports />} */} {/* ปิดไว้ก่อน - API ยังไม่พร้อม */}
 
         {/* Modal */}
         {showModal && selectedBooking && (

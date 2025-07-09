@@ -202,6 +202,14 @@ class APIClient {
     });
   }
 
+  // Reset booking status to pending
+  async resetBookingToPending(id: number): Promise<APIResponse<Booking>> {
+    return this.request<Booking>(`/bookings/${id}/reset`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  }
+
   async getBookingStatus(id: number): Promise<APIResponse<Booking>> {
     return this.request<Booking>(`/bookings/${id}/status`);
   }

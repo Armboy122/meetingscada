@@ -153,9 +153,9 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
   // ฟังก์ชันสำหรับแสดงชื่อช่วงเวลา
   const getTimeSlotLabel = (timeSlot: TimeSlot) => {
     switch (timeSlot) {
-      case 'morning': return 'เช้า (09:00-12:00)';
+      case 'morning': return 'เช้า (08:30-12:00)';
       case 'afternoon': return 'บ่าย (13:00-17:00)';
-      case 'full_day': return 'เต็มวัน (09:00-17:00)';
+      case 'full_day': return 'เต็มวัน (08:30-17:00)';
       default: return timeSlot;
     }
   };
@@ -474,7 +474,7 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
                               value="morning" 
                               disabled={!isTimeSlotAvailableForDate(day.date, 'morning')}
                             >
-                              เช้า (09:00-12:00) {!isTimeSlotAvailableForDate(day.date, 'morning') ? '- จองแล้ว' : ''}
+                              เช้า (08:30-12:00) {!isTimeSlotAvailableForDate(day.date, 'morning') ? '- จองแล้ว' : ''}
                             </option>
                             <option 
                               value="afternoon" 
@@ -486,7 +486,7 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
                               value="full_day" 
                               disabled={!isTimeSlotAvailableForDate(day.date, 'full_day')}
                             >
-                              เต็มวัน (09:00-17:00) {!isTimeSlotAvailableForDate(day.date, 'full_day') ? '- จองแล้ว' : ''}
+                              เต็มวัน (08:30-17:00) {!isTimeSlotAvailableForDate(day.date, 'full_day') ? '- จองแล้ว' : ''}
                             </option>
                           </select>
                         </div>

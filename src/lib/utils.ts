@@ -14,11 +14,11 @@ export function formatDateTime(date: string | Date): string {
 export function getTimeSlotLabel(timeSlot: string): string {
   switch (timeSlot) {
     case 'morning':
-      return 'เช้า (09:00-12:00)';
+      return 'เช้า (08:30-12:00)';
     case 'afternoon':
       return 'บ่าย (13:00-17:00)';
     case 'full_day':
-      return 'เต็มวัน (09:00-17:00)';
+      return 'เต็มวัน (08:30-17:00)';
     default:
       return timeSlot;
   }

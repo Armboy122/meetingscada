@@ -86,3 +86,14 @@ export function useRejectBooking() {
     },
   });
 }
+
+export function useResetBookingToPending() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (id: number) => apiClient.resetBookingToPending(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    },
+  });
+}

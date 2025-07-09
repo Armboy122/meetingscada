@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { X } from 'lucide-react';
+import { X, Plus, Trash2 } from 'lucide-react';
+import { format, addDays } from 'date-fns';
 import { useRooms } from '../hooks/useRooms';
 
-import type { Booking, BookingFormData } from '../types';
+import type { Booking, BookingFormData, TimeSlot } from '../types';
 
 interface EditBookingModalProps {
   booking: Booking | null;
@@ -12,9 +13,15 @@ interface EditBookingModalProps {
   onSave: (data: BookingFormData) => Promise<void>;
 }
 
+interface BookingDay {
+  date: string;
+  timeSlot: TimeSlot;
+}
+
 export function EditBookingModal({ booking, isOpen, onClose, onSave }: EditBookingModalProps) {
   const { data: rooms = [] } = useRooms();
   const [isLoading, setIsLoading] = useState(false);
+  const [bookingDays, setBookingDays] = useState<BookingDay[]>([]);
   
   const {
     register,
@@ -30,25 +37,82 @@ export function EditBookingModal({ booking, isOpen, onClose, onSave }: EditBooki
       setValue('bookerName', booking.bookerName);
       setValue('phoneNumber', booking.phoneNumber);
       setValue('meetingTitle', booking.meetingTitle || '');
-      setValue('timeSlot', booking.timeSlot);
       setValue('roomId', booking.roomId);
       
-      // Set booking dates if available
+      // Set booking dates and time slots
       if (booking.dates && booking.dates.length > 0) {
-        // dates ตอนนี้เป็น string array แล้ว เช่น ["2024-01-15"]
+        // สร้าง BookingDay array จากข้อมูลเดิม
+        const days: BookingDay[] = booking.dates.map(date => ({
+          date: format(new Date(date), 'yyyy-MM-dd'),
+          timeSlot: booking.timeSlot
+        }));
+        setBookingDays(days);
         setValue('dates', booking.dates);
+        setValue('timeSlot', booking.timeSlot);
+      } else {
+        // ถ้าไม่มี dates array ให้ใช้วันปัจจุบัน
+        const defaultDay: BookingDay = {
+          date: format(new Date(), 'yyyy-MM-dd'),
+          timeSlot: booking.timeSlot
+        };
+        setBookingDays([defaultDay]);
+        setValue('dates', [defaultDay.date]);
+        setValue('timeSlot', booking.timeSlot);
       }
     }
   }, [booking, isOpen, setValue]);
 
+  // ฟังก์ชันสำหรับจัดการ bookingDays
+  const addBookingDay = () => {
+    const lastDate = bookingDays.length > 0 ? bookingDays[bookingDays.length - 1].date : format(new Date(), 'yyyy-MM-dd');
+    const nextDate = format(addDays(new Date(lastDate), 1), 'yyyy-MM-dd');
+    
+    const newDay: BookingDay = {
+      date: nextDate,
+      timeSlot: 'morning' // default time slot
+    };
+    
+    const updatedDays = [...bookingDays, newDay];
+    setBookingDays(updatedDays);
+    setValue('dates', updatedDays.map(day => day.date));
+  };
+
+  const removeBookingDay = (index: number) => {
+    if (bookingDays.length > 1) {
+      const updatedDays = bookingDays.filter((_, i) => i !== index);
+      setBookingDays(updatedDays);
+      setValue('dates', updatedDays.map(day => day.date));
+    }
+  };
+
+  const updateBookingDay = (index: number, field: keyof BookingDay, value: string) => {
+    const updatedDays = bookingDays.map((day, i) => 
+      i === index ? { ...day, [field]: value } : day
+    );
+    setBookingDays(updatedDays);
+    setValue('dates', updatedDays.map(day => day.date));
+  };
+
   const onSubmit = async (data: BookingFormData) => {
     setIsLoading(true);
     try {
+      // อัปเดตข้อมูลจาก bookingDays
+      data.dates = bookingDays.map(day => day.date);
+      
+      // Debug: แสดงข้อมูลที่กำลังจะส่ง
+      console.log('EditBookingModal - Sending data:', {
+        originalBooking: booking,
+        formData: data,
+        bookingDays: bookingDays
+      });
+      
       await onSave(data);
       reset();
       onClose();
     } catch (error) {
       console.error('Error updating booking:', error);
+      // แสดง error message ให้ผู้ใช้เห็น
+      alert(`เกิดข้อผิดพลาดในการบันทึก: ${error instanceof Error ? error.message : 'ไม่ทราบสาเหตุ'}`);
     } finally {
       setIsLoading(false);
     }
@@ -120,99 +184,89 @@ export function EditBookingModal({ booking, isOpen, onClose, onSave }: EditBooki
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">
-                ห้องประชุม *
-              </label>
-              <select
-                {...register('roomId', { required: 'กรุณาเลือกห้องประชุม' })}
-                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white/80 text-sm sm:text-base"
-              >
-                <option value="">เลือกห้องประชุม</option>
-                {rooms.map(room => (
-                  <option key={room.id} value={room.id}>
-                    {room.roomName} (ความจุ {room.capacity} ที่นั่ง)
-                  </option>
-                ))}
-              </select>
-              {errors.roomId && (
-                <p className="mt-1 text-xs sm:text-sm text-red-600">{errors.roomId.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">
-                วันที่จอง *
-              </label>
-              <input
-                type="date"
-                {...register('dates.0', { required: 'กรุณาเลือกวันที่' })}
-                min={new Date().toISOString().split('T')[0]}
-                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white/80 text-sm sm:text-base"
-              />
-              {errors.dates?.[0] && (
-                <p className="mt-1 text-xs sm:text-sm text-red-600">{errors.dates[0].message}</p>
-              )}
-            </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              ห้องประชุม *
+            </label>
+            <select
+              {...register('roomId', { required: 'กรุณาเลือกห้องประชุม' })}
+              className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white/80 text-sm sm:text-base"
+            >
+              <option value="">เลือกห้องประชุม</option>
+              {rooms.map(room => (
+                <option key={room.id} value={room.id}>
+                  {room.roomName} (ความจุ {room.capacity} ที่นั่ง)
+                </option>
+              ))}
+            </select>
+            {errors.roomId && (
+              <p className="mt-1 text-xs sm:text-sm text-red-600">{errors.roomId.message}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-3">
-              ช่วงเวลา *
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <label className="flex items-center p-3 sm:p-4 border-2 border-purple-200 rounded-xl cursor-pointer hover:bg-purple-50 transition-all duration-200">
-                <input
-                  type="radio"
-                  value="morning"
-                  {...register('timeSlot', { required: 'กรุณาเลือกช่วงเวลา' })}
-                  className="sr-only"
-                />
-                <div className="flex items-center justify-center w-4 h-4 border-2 border-purple-400 rounded-full mr-3">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full opacity-0 peer-checked:opacity-100"></div>
-                </div>
-                <div>
-                  <div className="font-medium text-slate-800 text-sm sm:text-base">เช้า</div>
-                  <div className="text-xs sm:text-sm text-slate-600">09:00 - 12:00</div>
-                </div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-bold text-slate-700">
+                วันที่และช่วงเวลาที่ต้องการจอง *
               </label>
-
-              <label className="flex items-center p-3 sm:p-4 border-2 border-purple-200 rounded-xl cursor-pointer hover:bg-purple-50 transition-all duration-200">
-                <input
-                  type="radio"
-                  value="afternoon"
-                  {...register('timeSlot', { required: 'กรุณาเลือกช่วงเวลา' })}
-                  className="sr-only"
-                />
-                <div className="flex items-center justify-center w-4 h-4 border-2 border-purple-400 rounded-full mr-3">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full opacity-0 peer-checked:opacity-100"></div>
-                </div>
-                <div>
-                  <div className="font-medium text-slate-800 text-sm sm:text-base">บ่าย</div>
-                  <div className="text-xs sm:text-sm text-slate-600">13:00 - 17:00</div>
-                </div>
-              </label>
-
-              <label className="flex items-center p-3 sm:p-4 border-2 border-purple-200 rounded-xl cursor-pointer hover:bg-purple-50 transition-all duration-200">
-                <input
-                  type="radio"
-                  value="full_day"
-                  {...register('timeSlot', { required: 'กรุณาเลือกช่วงเวลา' })}
-                  className="sr-only"
-                />
-                <div className="flex items-center justify-center w-4 h-4 border-2 border-purple-400 rounded-full mr-3">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full opacity-0 peer-checked:opacity-100"></div>
-                </div>
-                <div>
-                  <div className="font-medium text-slate-800 text-sm sm:text-base">เต็มวัน</div>
-                  <div className="text-xs sm:text-sm text-slate-600">09:00 - 17:00</div>
-                </div>
-              </label>
+              <button
+                type="button"
+                onClick={addBookingDay}
+                className="flex items-center px-3 py-1 text-sm bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-all duration-200"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                เพิ่มวัน
+              </button>
             </div>
-            {errors.timeSlot && (
-              <p className="mt-2 text-xs sm:text-sm text-red-600">{errors.timeSlot.message}</p>
-            )}
+            
+            <div className="space-y-3">
+              {bookingDays.map((day, index) => (
+                <div key={index} className="p-4 border border-purple-200 rounded-xl bg-purple-50/50">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        วันที่ {index + 1}
+                      </label>
+                      <input
+                        type="date"
+                        value={day.date}
+                        onChange={(e) => updateBookingDay(index, 'date', e.target.value)}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        ช่วงเวลา
+                      </label>
+                      <select
+                        value={day.timeSlot}
+                        onChange={(e) => updateBookingDay(index, 'timeSlot', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="morning">เช้า (08:30-12:00)</option>
+                        <option value="afternoon">บ่าย (13:00-17:00)</option>
+                        <option value="full_day">เต็มวัน (08:30-17:00)</option>
+                      </select>
+                    </div>
+
+                    <div className="flex justify-end">
+                      {bookingDays.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeBookingDay(index)}
+                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-all duration-200"
+                          title="ลบวันนี้"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3 pt-4 sm:pt-6 border-t border-purple-100">
