@@ -65,9 +65,9 @@ export function BookingModal({ booking, isOpen, onClose }: BookingModalProps) {
               วันที่จอง
             </label>
             <div className="text-sm text-gray-900">
-              {booking.dates && booking.dates.length > 0 ? booking.dates.map(date => (
-                <div key={date.id}>{formatDate(date.bookingDate)}</div>
-              )) : formatDate(booking.createdAt)}
+              {booking.dates && booking.dates.length > 0 ? booking.dates.map((date, index) => (
+                <div key={index}>{formatDate(date)}</div>
+              )) : <div className="text-red-500">ไม่พบข้อมูลวันที่จอง</div>}
             </div>
           </div>
 

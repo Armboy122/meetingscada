@@ -26,22 +26,15 @@ export function Calendar({ selectedRoomId, onDateClick, onBookingClick }: Calend
     const map = new Map<string, Booking[]>();
     if (bookings && Array.isArray(bookings)) {
       bookings.forEach((booking: Booking) => {
-        // ถ้าไม่มี dates array ให้ใช้วันที่ปัจจุบันจาก createdAt
-        if (booking.dates && Array.isArray(booking.dates)) {
+        // ใช้ dates array จาก Backend (เป็น string array)
+        if (booking.dates && Array.isArray(booking.dates) && booking.dates.length > 0) {
           booking.dates.forEach((date) => {
-            const dateKey = format(new Date(date.bookingDate), 'yyyy-MM-dd');
+            const dateKey = format(new Date(date), 'yyyy-MM-dd');
             if (!map.has(dateKey)) {
               map.set(dateKey, []);
             }
             map.get(dateKey)?.push(booking);
           });
-        } else {
-          // Fallback: ใช้ createdAt เป็นวันที่จอง
-          const dateKey = format(new Date(booking.createdAt), 'yyyy-MM-dd');
-          if (!map.has(dateKey)) {
-            map.set(dateKey, []);
-          }
-          map.get(dateKey)?.push(booking);
         }
       });
     }

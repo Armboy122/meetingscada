@@ -35,8 +35,8 @@ export function EditBookingModal({ booking, isOpen, onClose, onSave }: EditBooki
       
       // Set booking dates if available
       if (booking.dates && booking.dates.length > 0) {
-        const bookingDate = new Date(booking.dates[0].bookingDate);
-        setValue('dates', [bookingDate.toISOString().split('T')[0]]);
+        // dates ตอนนี้เป็น string array แล้ว เช่น ["2024-01-15"]
+        setValue('dates', booking.dates);
       }
     }
   }, [booking, isOpen, setValue]);

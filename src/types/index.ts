@@ -22,7 +22,7 @@ export interface Booking {
   status: 'pending' | 'approved' | 'rejected' | 'cancelled';
   createdAt: string;
   updatedAt: string;
-  dates?: BookingDate[]; // ทำให้ optional เพราะ backend อาจไม่ส่งมา
+  dates?: string[]; // แก้ไขเป็น array ของ string แทน BookingDate[]
 }
 
 export interface BookingDate {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BarChart3, Calendar, Users, TrendingUp, Clock, Filter, Download } from 'lucide-react';
-import { useHistory, useHistorySummary, useBookingHistory } from '../hooks/useHistory';
+import { useHistory, useHistorySummary} from '../hooks/useHistory';
 import { useAdmins } from '../hooks/useAdmins';
 import { formatDate } from '../lib/utils';
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ArrowLeft, Check, X, Edit, Eye, Trash2, Building, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Check, X, Edit, Eye, Trash2, Building, BarChart3, Users } from 'lucide-react';
 import { useBookings, useApproveBooking, useRejectBooking, useUpdateBooking, useDeleteBooking } from '../hooks/useBookings';
+import { useAdmins } from '../hooks/useAdmins';
 import { EditBookingModal } from './EditBookingModal';
 import { formatDate, getTimeSlotLabel, getStatusLabel, getStatusColor } from '../lib/utils';
 import type { Booking, BookingFormData } from '../types';
@@ -28,10 +29,23 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
 
   const { data: bookings = [], refetch } = useBookings({ status: selectedStatus });
   const { data: allBookings = [], refetch: refetchAll } = useBookings({}); // ดึงข้อมูลทั้งหมดสำหรับ count
+  const { data: admins = [], isLoading: isLoadingAdmins } = useAdmins(); // ดึงข้อมูล admins และ loading state
   const approveBooking = useApproveBooking();
   const rejectBooking = useRejectBooking();
   const updateBooking = useUpdateBooking();
   const deleteBooking = useDeleteBooking();
+
+  // ฟังก์ชันสำหรับหา admin ที่ active
+  const getActiveAdminId = () => {
+    const activeAdmin = admins.find(admin => admin.isActive);
+    return activeAdmin?.id || 1; // fallback เป็น 1 ถ้าไม่พบ
+  };
+
+  // ตรวจสอบว่ามี admin หรือไม่
+  const hasActiveAdmin = admins.length > 0 && admins.some(admin => admin.isActive);
+
+  // ตรวจสอบว่าเป็น Super Admin หรือไม่ (armoff122)
+  const isSuperAdmin = admins.some(admin => admin.username === 'armoff122' && admin.isActive);
 
   const handleApprove = async (booking: Booking) => {
     setSelectedBooking(booking);
@@ -91,16 +105,24 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
   const handleConfirmAction = async () => {
     if (!selectedBooking) return;
 
+    // ตรวจสอบว่ามี admin หรือไม่
+    if (!hasActiveAdmin) {
+      alert('ไม่พบผู้ดูแลระบบที่ใช้งานได้ กรุณาสร้างบัญชีผู้ดูแลในแท็บ "จัดการผู้ดูแล"');
+      return;
+    }
+
     try {
+      const adminId = getActiveAdminId();
+      
       if (actionType === 'approve') {
         await approveBooking.mutateAsync({
           id: selectedBooking.id,
-          data: { adminId: 1 }
+          data: { adminId }
         });
       } else {
         await rejectBooking.mutateAsync({
           id: selectedBooking.id,
-          data: { adminId: 1, reason: rejectReason }
+          data: { adminId, reason: rejectReason }
         });
       }
       setShowModal(false);
@@ -109,6 +131,9 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
       refetchAll();
     } catch (error) {
       console.error('Error processing booking:', error);
+      // แสดง error message ที่เป็นประโยชน์
+      const errorMessage = error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการประมวลผล';
+      alert(`เกิดข้อผิดพลาด: ${errorMessage}`);
     }
   };
 
@@ -122,6 +147,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
   const adminTabs = [
     { key: 'bookings', label: 'จัดการการจอง', icon: Check, count: allBookings.filter(b => b.status === 'pending').length },
     { key: 'rooms', label: 'จัดการห้องประชุม', icon: Building },
+    ...(isSuperAdmin ? [{ key: 'admins', label: 'จัดการผู้ดูแล', icon: Users }] : []),
     { key: 'reports', label: 'รายงานและประวัติ', icon: BarChart3 },
   ];
 
@@ -138,9 +164,16 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
               <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="font-bold text-sm sm:text-base">กลับหน้าแรก</span>
             </button>
-            <div>
+            <div className="flex-1">
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-800">Admin Dashboard</h1>
-              <p className="text-sm sm:text-base text-slate-600 mt-1 sm:mt-2">จัดการระบบจองห้องประชุม</p>
+              <div className="flex items-center space-x-4 mt-1 sm:mt-2">
+                <p className="text-sm sm:text-base text-slate-600">จัดการระบบจองห้องประชุม</p>
+                {isSuperAdmin && (
+                  <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-gradient-to-r from-purple-100 to-violet-100 text-purple-700 rounded-full border border-purple-200">
+                    👑 Super Admin
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -180,6 +213,37 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
         {/* Tab Content */}
         {activeTab === 'bookings' && (
           <>
+            {/* แสดงข้อความเตือนถ้าไม่มี admin */}
+            {!hasActiveAdmin && !isLoadingAdmins && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 text-yellow-700">
+                      <span className="text-sm font-medium">⚠️ ไม่พบผู้ดูแลระบบที่ใช้งานได้</span>
+                    </div>
+                    <p className="text-sm text-yellow-600 mt-1">
+                      กรุณาสร้างบัญชีผู้ดูแลระบบในแท็บ "จัดการผู้ดูแล" ก่อนดำเนินการอนุมัติหรือปฏิเสธการจอง
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('admins')}
+                    className="ml-4 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium"
+                  >
+                    ไปจัดการผู้ดูแล
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* แสดงข้อความเตือนถ้ากำลังโหลด */}
+            {isLoadingAdmins && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                <div className="flex items-center space-x-2 text-blue-700">
+                  <span className="text-sm font-medium">🔄 กำลังโหลดข้อมูลผู้ดูแลระบบ...</span>
+                </div>
+              </div>
+            )}
+
             {/* Status Tabs */}
             <div className="bg-white/90 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl border border-purple-100/50 p-2 mb-6 sm:mb-8">
               <div className="flex space-x-1 sm:space-x-2 overflow-x-auto scrollbar-hide">
@@ -217,7 +281,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <div className="text-lg font-bold text-slate-800">
-                          {booking.dates && booking.dates.length > 0 ? formatDate(booking.dates[0].bookingDate) : formatDate(booking.createdAt)}
+                          {booking.dates && booking.dates.length > 0 ? formatDate(booking.dates[0]) : formatDate(booking.createdAt)}
                         </div>
                         <div className="text-base font-semibold text-purple-600 mt-1">
                           {getTimeSlotLabel(booking.timeSlot)}
@@ -301,15 +365,17 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                         <>
                           <button
                             onClick={() => handleApprove(booking)}
-                            className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-all duration-200"
-                            title="อนุมัติ"
+                            disabled={!hasActiveAdmin}
+                            className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={!hasActiveAdmin ? 'ต้องมีผู้ดูแลระบบก่อนอนุมัติ' : 'อนุมัติ'}
                           >
                             <Check className="w-3 h-3" />
                           </button>
                           <button
                             onClick={() => handleReject(booking)}
-                            className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
-                            title="ปฏิเสธ"
+                            disabled={!hasActiveAdmin}
+                            className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={!hasActiveAdmin ? 'ต้องมีผู้ดูแลระบบก่อนปฏิเสธ' : 'ปฏิเสธ'}
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -353,7 +419,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                         {/* วันที่และเวลา */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-bold text-slate-800">
-                            {booking.dates && booking.dates.length > 0 ? formatDate(booking.dates[0].bookingDate) : formatDate(booking.createdAt)}
+                            {booking.dates && booking.dates.length > 0 ? formatDate(booking.dates[0]) : <span className="text-red-500">ไม่พบข้อมูลวันที่</span>}
                           </div>
                           <div className="text-sm font-medium text-purple-600">
                             {getTimeSlotLabel(booking.timeSlot)}
@@ -421,15 +487,17 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                               <>
                                 <button
                                   onClick={() => handleApprove(booking)}
-                                  className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-all duration-200"
-                                  title="อนุมัติ"
+                                  disabled={!hasActiveAdmin}
+                                  className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title={!hasActiveAdmin ? 'ต้องมีผู้ดูแลระบบก่อนอนุมัติ' : 'อนุมัติ'}
                                 >
                                   <Check className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => handleReject(booking)}
-                                  className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
-                                  title="ปฏิเสธ"
+                                  disabled={!hasActiveAdmin}
+                                  className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title={!hasActiveAdmin ? 'ต้องมีผู้ดูแลระบบก่อนปฏิเสธ' : 'ปฏิเสธ'}
                                 >
                                   <X className="w-4 h-4" />
                                 </button>
@@ -452,7 +520,14 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
         )}
 
         {activeTab === 'rooms' && <RoomManagement />}
-        {activeTab === 'admins' && <AdminManagement />}
+        {activeTab === 'admins' && isSuperAdmin && <AdminManagement />}
+        {activeTab === 'admins' && !isSuperAdmin && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center">
+            <div className="text-red-600 text-4xl mb-4">🚫</div>
+            <h3 className="text-lg font-bold text-red-800 mb-2">ไม่มีสิทธิ์เข้าถึง</h3>
+            <p className="text-red-600">เฉพาะ Super Admin เท่านั้นที่สามารถจัดการผู้ดูแลระบบได้</p>
+          </div>
+        )}
         {activeTab === 'reports' && <HistoryReports />}
 
         {/* Modal */}
@@ -478,8 +553,8 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                 </div>
                 <div className="text-sm sm:text-base">
                   <span className="font-bold text-slate-700">วันที่:</span>
-                  {selectedBooking.dates && selectedBooking.dates.length > 0 ? selectedBooking.dates.map(date => (
-                    <div key={date.id} className="ml-2 sm:ml-4 text-slate-800">• {formatDate(date.bookingDate)}</div>
+                  {selectedBooking.dates && selectedBooking.dates.length > 0 ? selectedBooking.dates.map((date, index) => (
+                    <div key={index} className="ml-2 sm:ml-4 text-slate-800">• {formatDate(date)}</div>
                   )) : (
                     <div className="ml-2 sm:ml-4 text-slate-800">• {formatDate(selectedBooking.createdAt)}</div>
                   )}
@@ -535,17 +610,30 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                 
                 {/* แสดงปุ่มอนุมัติ/ปฏิเสธ เฉพาะสถานะ pending */}
                 {selectedBooking.status === 'pending' && (
-                  <button
-                    onClick={handleConfirmAction}
-                    disabled={actionType === 'reject' && !rejectReason.trim()}
-                    className={`px-4 sm:px-6 py-2 sm:py-3 text-white rounded-xl font-medium transition-all duration-200 order-1 sm:order-2 ${
-                      actionType === 'approve'
-                        ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 shadow-lg hover:shadow-xl'
-                        : 'bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 shadow-lg hover:shadow-xl'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {actionType === 'approve' ? 'อนุมัติ' : 'ปฏิเสธ'}
-                  </button>
+                  <>
+                    {!hasActiveAdmin && (
+                      <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+                        <div className="flex items-center space-x-2 text-yellow-700">
+                          <span className="text-sm font-medium">⚠️ ไม่พบผู้ดูแลระบบที่ใช้งานได้</span>
+                        </div>
+                        <p className="text-sm text-yellow-600 mt-1">
+                          กรุณาสร้างบัญชีผู้ดูแลระบบในแท็บ "จัดการผู้ดูแล" ก่อนดำเนินการอนุมัติ
+                        </p>
+                      </div>
+                    )}
+                    
+                    <button
+                      onClick={handleConfirmAction}
+                      disabled={actionType === 'reject' && !rejectReason.trim() || !hasActiveAdmin}
+                      className={`px-4 sm:px-6 py-2 sm:py-3 text-white rounded-xl font-medium transition-all duration-200 order-1 sm:order-2 ${
+                        actionType === 'approve'
+                          ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 shadow-lg hover:shadow-xl'
+                          : 'bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 shadow-lg hover:shadow-xl'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      {actionType === 'approve' ? 'อนุมัติ' : 'ปฏิเสธ'}
+                    </button>
+                  </>
                 )}
                 
                 {/* แสดงปุ่ม disabled เมื่อสถานะไม่ใช่ pending */}

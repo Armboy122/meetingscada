@@ -32,7 +32,10 @@ export function useCreateBooking() {
   return useMutation({
     mutationFn: (data: BookingFormData) => apiClient.createBooking(data),
     onSuccess: () => {
+      // Invalidate all booking-related queries
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      // Also refetch immediately to update the UI
+      queryClient.refetchQueries({ queryKey: ['bookings'] });
     },
   });
 }
