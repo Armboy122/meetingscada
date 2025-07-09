@@ -28,7 +28,7 @@ export function useCreateAdmin() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (data: { username: string; passwordHash: string; fullName: string; email: string }) => 
+    mutationFn: (data: { username: string; password: string; fullName: string; email: string }) => 
       apiClient.createAdmin(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admins'] });

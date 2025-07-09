@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ArrowLeft, Check, X, Edit, Eye, Trash2, Building, BarChart3, Users } from 'lucide-react';
+import { ArrowLeft, Check, X, Edit, Eye, Trash2, Building, BarChart3, Users, LogOut, Key } from 'lucide-react';
 import { useBookings, useApproveBooking, useRejectBooking, useUpdateBooking, useDeleteBooking } from '../hooks/useBookings';
-import { useAdmins } from '../hooks/useAdmins';
+import { useAuth } from '../contexts/AuthContext';
 import { EditBookingModal } from './EditBookingModal';
+import { ChangePasswordModal } from './ChangePasswordModal';
 import { formatDate, getTimeSlotLabel, getStatusLabel, getStatusColor } from '../lib/utils';
 import type { Booking, BookingFormData } from '../types';
 
@@ -24,28 +25,28 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
 
   const { data: bookings = [], refetch } = useBookings({ status: selectedStatus });
   const { data: allBookings = [], refetch: refetchAll } = useBookings({}); // ดึงข้อมูลทั้งหมดสำหรับ count
-  const { data: admins = [], isLoading: isLoadingAdmins } = useAdmins(); // ดึงข้อมูล admins และ loading state
+  const { admin: currentUser, logout, loading: authLoading } = useAuth(); // ใช้ current user จาก Auth Context
   const approveBooking = useApproveBooking();
   const rejectBooking = useRejectBooking();
   const updateBooking = useUpdateBooking();
   const deleteBooking = useDeleteBooking();
 
-  // ฟังก์ชันสำหรับหา admin ที่ active
+  // ฟังก์ชันสำหรับหา admin ที่ active (ใช้ current user)
   const getActiveAdminId = () => {
-    const activeAdmin = admins.find(admin => admin.isActive);
-    return activeAdmin?.id || 1; // fallback เป็น 1 ถ้าไม่พบ
+    return currentUser?.id || 1; // fallback เป็น 1 ถ้าไม่พบ
   };
 
-  // ตรวจสอบว่ามี admin หรือไม่
-  const hasActiveAdmin = admins.length > 0 && admins.some(admin => admin.isActive);
+  // ตรวจสอบว่ามี admin หรือไม่ (ใช้ current user)
+  const hasActiveAdmin = !!currentUser && currentUser.isActive;
 
-  // ตรวจสอบว่าเป็น Super Admin หรือไม่ (armoff122)
-  const isSuperAdmin = admins.some(admin => admin.username === 'armoff122' && admin.isActive);
+  // ตรวจสอบว่าเป็น Super Admin หรือไม่ (ใช้ current user)
+  const isSuperAdmin = currentUser?.username === 'armoff122' && currentUser?.isActive;
 
   const handleApprove = async (booking: Booking) => {
     setSelectedBooking(booking);
@@ -164,16 +165,37 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
               <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="font-bold text-sm sm:text-base">กลับหน้าแรก</span>
             </button>
+            
             <div className="flex-1">
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-800">Admin Dashboard</h1>
               <div className="flex items-center space-x-4 mt-1 sm:mt-2">
-                <p className="text-sm sm:text-base text-slate-600">จัดการระบบจองห้องประชุม</p>
+                <p className="text-sm sm:text-base text-slate-600">
+                  ยินดีต้อนรับ <span className="font-semibold text-purple-600">{currentUser?.fullName}</span>
+                </p>
                 {isSuperAdmin && (
                   <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-gradient-to-r from-purple-100 to-violet-100 text-purple-700 rounded-full border border-purple-200">
                     👑 Super Admin
                   </span>
                 )}
               </div>
+            </div>
+            
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <button
+                onClick={() => setShowChangePasswordModal(true)}
+                className="flex items-center space-x-2 px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-blue-100 to-cyan-100 hover:from-blue-200 hover:to-cyan-200 text-blue-700 hover:text-blue-800 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 border border-blue-200 hover:border-blue-300"
+              >
+                <Key className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="font-medium text-sm sm:text-base hidden sm:inline">เปลี่ยนรหัสผ่าน</span>
+              </button>
+              
+              <button
+                onClick={logout}
+                className="flex items-center space-x-2 px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-red-100 to-rose-100 hover:from-red-200 hover:to-rose-200 text-red-700 hover:text-red-800 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 border border-red-200 hover:border-red-300"
+              >
+                <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="font-medium text-sm sm:text-base hidden sm:inline">ออกจากระบบ</span>
+              </button>
             </div>
           </div>
         </div>
@@ -214,7 +236,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
         {activeTab === 'bookings' && (
           <>
             {/* แสดงข้อความเตือนถ้าไม่มี admin */}
-            {!hasActiveAdmin && !isLoadingAdmins && (
+            {!hasActiveAdmin && !authLoading && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
@@ -236,7 +258,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
             )}
 
             {/* แสดงข้อความเตือนถ้ากำลังโหลด */}
-            {isLoadingAdmins && (
+            {authLoading && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
                 <div className="flex items-center space-x-2 text-blue-700">
                   <span className="text-sm font-medium">🔄 กำลังโหลดข้อมูลผู้ดูแลระบบ...</span>
@@ -693,6 +715,17 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
             setSelectedBooking(null);
           }}
           onSave={handleSaveEdit}
+        />
+        
+        {/* Change Password Modal */}
+        <ChangePasswordModal
+          isOpen={showChangePasswordModal}
+          onClose={() => setShowChangePasswordModal(false)}
+          onSuccess={() => {
+            setShowChangePasswordModal(false);
+            // แจ้งเตือนเปลี่ยนรหัสผ่านสำเร็จ
+            alert('เปลี่ยนรหัสผ่านสำเร็จ');
+          }}
         />
       </div>
     </div>

@@ -26,7 +26,6 @@ function App() {
   const [isBookingFormOpen, setIsBookingFormOpen] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [loginError, setLoginError] = useState<string>('');
 
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
@@ -43,28 +42,20 @@ function App() {
     setSelectedDate(null);
   };
 
-  const handleAdminLogin = (credentials: { username: string; password: string }) => {
-    // Simple demo login - ในการใช้งานจริงควรเรียก API
-    if (credentials.username === 'admin' && credentials.password === 'password') {
-      setIsAdminLoggedIn(true);
-      setLoginError('');
-    } else {
-      setLoginError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-    }
+  const handleAdminLoginSuccess = () => {
+    setIsAdminLoggedIn(true);
   };
 
   const handleAdminLogout = () => {
     setIsAdminLoggedIn(false);
     setShowAdmin(false);
-    setLoginError('');
   };
 
   if (showAdmin && !isAdminLoggedIn) {
     return (
       <AdminLogin
-        onLogin={handleAdminLogin}
+        onSuccess={handleAdminLoginSuccess}
         onBack={() => setShowAdmin(false)}
-        error={loginError}
       />
     );
   }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Edit, Trash2, Users, X, Mail, User, Key } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, X, Mail, User, Key, Eye } from 'lucide-react';
 import { useAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin } from '../hooks/useAdmins';
 import type { Admin } from '../types';
 
@@ -8,6 +8,8 @@ interface AdminFormData {
   username: string;
   fullName: string;
   email: string;
+  password?: string;
+  confirmPassword?: string;
   passwordHash?: string;
   isActive?: boolean;
 }
@@ -18,6 +20,8 @@ export function AdminManagement() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const createAdmin = useCreateAdmin();
   const updateAdmin = useUpdateAdmin();
@@ -27,6 +31,7 @@ export function AdminManagement() {
     register: registerCreate,
     handleSubmit: handleSubmitCreate,
     reset: resetCreate,
+    watch: watchCreate,
     formState: { errors: errorsCreate }
   } = useForm<AdminFormData>();
 
@@ -40,10 +45,18 @@ export function AdminManagement() {
 
   const handleCreateAdmin = async (data: AdminFormData) => {
     try {
-      // In a real app, password should be hashed on the server
+      // ตรวจสอบรหัสผ่าน
+      if (!data.password) {
+        console.error('Password is required');
+        return;
+      }
+      
+      // ส่งรหัสผ่าน plain text ไป Backend จะเป็นคน hash
       const adminData = {
-        ...data,
-        passwordHash: `$2b$10$hashedpassword_${Date.now()}` // Mock hash
+        username: data.username,
+        fullName: data.fullName,
+        email: data.email,
+        password: data.password // ส่ง plain text password
       };
       await createAdmin.mutateAsync(adminData);
       setShowCreateModal(false);
@@ -304,14 +317,64 @@ export function AdminManagement() {
                 )}
               </div>
               
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-                <div className="flex items-center space-x-2 text-yellow-700">
-                  <Key className="w-4 h-4" />
-                  <span className="text-sm font-medium">หมายเหตุเรื่องรหัสผ่าน</span>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">
+                  รหัสผ่าน *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    {...registerCreate('password', { 
+                      required: 'กรุณากรอกรหัสผ่าน',
+                      minLength: {
+                        value: 6,
+                        message: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'
+                      }
+                    })}
+                    className="w-full px-4 py-3 pr-12 border border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white/80"
+                    placeholder="กรอกรหัสผ่าน"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-400 hover:text-purple-600"
+                  >
+                    {showPassword ? <Eye className="w-5 h-5" /> : <Key className="w-5 h-5" />}
+                  </button>
                 </div>
-                <p className="text-sm text-yellow-600 mt-1">
-                  รหัสผ่านเริ่มต้นจะถูกสร้างโดยอัตโนมัติและส่งให้ผู้ดูแลผ่านอีเมล
-                </p>
+                {errorsCreate.password && (
+                  <p className="mt-1 text-sm text-red-600">{errorsCreate.password.message}</p>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">
+                  ยืนยันรหัสผ่าน *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    {...registerCreate('confirmPassword', { 
+                      required: 'กรุณายืนยันรหัสผ่าน',
+                      validate: (value) => {
+                        const passwordValue = watchCreate('password');
+                        return value === passwordValue || 'รหัสผ่านไม่ตรงกัน';
+                      }
+                    })}
+                    className="w-full px-4 py-3 pr-12 border border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white/80"
+                    placeholder="กรอกรหัสผ่านอีกครั้ง"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-400 hover:text-purple-600"
+                  >
+                    {showConfirmPassword ? <Eye className="w-5 h-5" /> : <Key className="w-5 h-5" />}
+                  </button>
+                </div>
+                {errorsCreate.confirmPassword && (
+                  <p className="mt-1 text-sm text-red-600">{errorsCreate.confirmPassword.message}</p>
+                )}
               </div>
               
               <div className="flex space-x-3 pt-4">

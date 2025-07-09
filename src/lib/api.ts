@@ -11,6 +11,19 @@ class APIClient {
     this.baseURL = baseURL;
   }
 
+  private getAuthHeaders(): HeadersInit {
+    const token = localStorage.getItem('authToken');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return headers;
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
@@ -19,11 +32,19 @@ class APIClient {
     
     const response = await fetch(url, {
       headers: {
-        'Content-Type': 'application/json',
+        ...this.getAuthHeaders(),
         ...options.headers,
       },
       ...options,
     });
+
+    // Handle 401 Unauthorized - redirect to login
+    if (response.status === 401) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('adminData');
+      window.location.href = '/';
+      throw new Error('กรุณาเข้าสู่ระบบใหม่');
+    }
 
     if (!response.ok) {
       let errorMessage = `HTTP error! status: ${response.status}`;
@@ -48,7 +69,26 @@ class APIClient {
     return this.request<{ version: string; timestamp: string }>('/');
   }
 
-  // Rooms API
+  // Authentication API
+  async login(username: string, password: string): Promise<APIResponse<{ token: string; admin: Admin }>> {
+    return this.request<{ token: string; admin: Admin }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
+  }
+
+  async getCurrentUser(): Promise<APIResponse<Admin>> {
+    return this.request<Admin>('/auth/me');
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<APIResponse<{ message: string }>> {
+    return this.request<{ message: string }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  }
+
+  // Rooms API (GET endpoints are public, others require auth)
   async getRooms(): Promise<APIResponse<MeetingRoom[]>> {
     return this.request<MeetingRoom[]>('/rooms');
   }
@@ -77,7 +117,7 @@ class APIClient {
     });
   }
 
-  // Bookings API
+  // Bookings API (public access for creating, auth required for management)
   async getBookings(params?: {
     status?: string;
     roomId?: number;
@@ -116,7 +156,7 @@ class APIClient {
     });
   }
 
-  // Approval API
+  // Approval API (requires auth)
   async approveBooking(id: number, data: ApprovalData): Promise<APIResponse<Booking>> {
     return this.request<Booking>(`/bookings/${id}/approve`, {
       method: 'POST',
@@ -135,7 +175,7 @@ class APIClient {
     return this.request<Booking>(`/bookings/${id}/status`);
   }
 
-  // Admins API
+  // Admins API (requires auth)
   async getAdmins(): Promise<APIResponse<Admin[]>> {
     return this.request<Admin[]>('/admins');
   }
@@ -144,7 +184,7 @@ class APIClient {
     return this.request<Admin>(`/admins/${id}`);
   }
 
-  async createAdmin(data: { username: string; passwordHash: string; fullName: string; email: string }): Promise<APIResponse<Admin>> {
+  async createAdmin(data: { username: string; password: string; fullName: string; email: string }): Promise<APIResponse<Admin>> {
     return this.request<Admin>('/admins', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -164,7 +204,7 @@ class APIClient {
     });
   }
 
-  // History API
+  // History API (requires auth)
   async getBookingHistory(id: number): Promise<APIResponse<BookingHistoryResponse>> {
     return this.request<BookingHistoryResponse>(`/bookings/${id}/history`);
   }
