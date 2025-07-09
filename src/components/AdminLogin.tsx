@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Lock, User, ArrowLeft } from 'lucide-react';
+import { Lock, User, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface AdminLoginProps {
@@ -8,32 +8,33 @@ interface AdminLoginProps {
   onSuccess: () => void;
 }
 
-interface LoginForm {
+interface LoginFormData {
   username: string;
   password: string;
 }
 
 export function AdminLogin({ onBack, onSuccess }: AdminLoginProps) {
   const { login } = useAuth();
+  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>();
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const onSubmit = async (data: LoginForm) => {
+  const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
-    setError('');
+    setErrorMessage('');
     
     try {
       await login(data.username, data.password);
       onSuccess();
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ';
-      setError(errorMessage);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'เกิดข้อผิดพลาดที่ไม่คาดคิด');
     } finally {
       setIsLoading(false);
     }
   };
+
+  // เช็คว่าเป็น server error หรือไม่
+  const isServerError = errorMessage.includes('เซิร์ฟเวอร์') || errorMessage.includes('เชื่อมต่อ') || errorMessage.includes('หมดเวลา');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-lavender-50 to-violet-50 flex items-center justify-center p-4">
@@ -61,55 +62,64 @@ export function AdminLogin({ onBack, onSuccess }: AdminLoginProps) {
         </div>
 
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl border border-purple-100/50 p-6 sm:p-8">
-          <form className="space-y-4 sm:space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-3 sm:px-4 py-2 sm:py-3 rounded-xl text-xs sm:text-sm font-medium">
-                {error}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
+            {errorMessage && (
+              <div className={`rounded-xl p-4 ${isServerError ? 'bg-orange-50 border border-orange-200' : 'bg-red-50 border border-red-200'}`}>
+                <div className="flex items-start space-x-3">
+                  <AlertCircle className={`w-5 h-5 mt-0.5 ${isServerError ? 'text-orange-600' : 'text-red-600'}`} />
+                  <div>
+                    <h3 className={`font-medium text-sm ${isServerError ? 'text-orange-800' : 'text-red-800'}`}>
+                      {isServerError ? 'เซิร์ฟเวอร์ไม่พร้อมใช้งาน' : 'ข้อผิดพลาดการเข้าสู่ระบบ'}
+                    </h3>
+                    <p className={`text-sm mt-1 ${isServerError ? 'text-orange-700' : 'text-red-700'}`}>
+                      {errorMessage}
+                    </p>
+                    {isServerError && (
+                      <p className="text-xs text-orange-600 mt-2 font-medium">
+                        💡 กำลังแก้ไขปัญหา กรุณารอสักครู่แล้วลองใหม่
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
-            <div className="space-y-4 sm:space-y-6">
-              <div>
-                <label htmlFor="username" className="block text-sm font-bold text-slate-700 mb-2">
-                  ชื่อผู้ใช้
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
-                    <User className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
-                  </div>
-                  <input
-                    type="text"
-                    {...register('username', { required: 'กรุณากรอกชื่อผู้ใช้' })}
-                    className="block w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white/80 font-medium text-sm sm:text-base transition-all duration-200"
-                    placeholder="กรอกชื่อผู้ใช้"
-                    disabled={isLoading}
-                  />
-                </div>
-                {errors.username && (
-                  <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-red-600 font-medium">{errors.username.message}</p>
-                )}
+            <div>
+              <label htmlFor="username" className="block text-sm sm:text-base font-medium text-slate-700 mb-2">
+                ชื่อผู้ใช้
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
+                <input
+                  id="username"
+                  type="text"
+                  {...register('username', { required: 'กรุณากรอกชื่อผู้ใช้' })}
+                  className="block w-full pl-10 pr-3 py-2.5 sm:py-3 text-sm sm:text-base bg-white/70 backdrop-blur-sm border border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all duration-200 shadow-sm"
+                  placeholder="กรอกชื่อผู้ใช้"
+                />
               </div>
+              {errors.username && (
+                <p className="mt-1 text-xs sm:text-sm text-red-600">{errors.username.message}</p>
+              )}
+            </div>
 
-              <div>
-                <label htmlFor="password" className="block text-sm font-bold text-slate-700 mb-2">
-                  รหัสผ่าน
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
-                    <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
-                  </div>
-                  <input
-                    type="password"
-                    {...register('password', { required: 'กรุณากรอกรหัสผ่าน' })}
-                    className="block w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 border border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white/80 font-medium text-sm sm:text-base transition-all duration-200"
-                    placeholder="กรอกรหัสผ่าน"
-                    disabled={isLoading}
-                  />
-                </div>
-                {errors.password && (
-                  <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-red-600 font-medium">{errors.password.message}</p>
-                )}
+            <div>
+              <label htmlFor="password" className="block text-sm sm:text-base font-medium text-slate-700 mb-2">
+                รหัสผ่าน
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
+                <input
+                  id="password"
+                  type="password"
+                  {...register('password', { required: 'กรุณากรอกรหัสผ่าน' })}
+                  className="block w-full pl-10 pr-3 py-2.5 sm:py-3 text-sm sm:text-base bg-white/70 backdrop-blur-sm border border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all duration-200 shadow-sm"
+                  placeholder="กรอกรหัสผ่าน"
+                />
               </div>
+              {errors.password && (
+                <p className="mt-1 text-xs sm:text-sm text-red-600">{errors.password.message}</p>
+              )}
             </div>
 
             <div className="pt-2 sm:pt-4">
@@ -131,7 +141,7 @@ export function AdminLogin({ onBack, onSuccess }: AdminLoginProps) {
 
             <div className="text-center pt-3 sm:pt-4 border-t border-purple-100">
               <p className="text-xs sm:text-sm text-slate-500 bg-purple-50 rounded-xl px-3 sm:px-4 py-2 font-medium">
-                🔑 Demo: <span className="font-bold text-purple-600">armoff122</span> / <span className="font-bold text-purple-600">armoff122</span>
+                🔑 กรุณาใช้ข้อมูลผู้ดูแลระบบที่ได้รับจากหน่วยงาน
               </p>
             </div>
           </form>

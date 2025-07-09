@@ -25,7 +25,12 @@ export function Calendar({ selectedRoomId, onDateClick, onBookingClick }: Calend
   const bookingsByDate = useMemo(() => {
     const map = new Map<string, Booking[]>();
     if (bookings && Array.isArray(bookings)) {
-      bookings.forEach((booking: Booking) => {
+      // กรองเฉพาะการจองที่ approved และ pending (ไม่เอา rejected)
+      const validBookings = bookings.filter((booking: Booking) => 
+        booking.status === 'approved' || booking.status === 'pending'
+      );
+      
+      validBookings.forEach((booking: Booking) => {
         // ใช้ dates array จาก Backend (เป็น string array)
         if (booking.dates && Array.isArray(booking.dates) && booking.dates.length > 0) {
           booking.dates.forEach((date) => {
@@ -44,6 +49,35 @@ export function Calendar({ selectedRoomId, onDateClick, onBookingClick }: Calend
   const getBookingsForDate = (date: Date) => {
     const dateKey = format(date, 'yyyy-MM-dd');
     return bookingsByDate.get(dateKey) || [];
+  };
+
+  // ตรวจสอบว่าช่วงเวลาไหนยังจองได้
+  const getAvailableTimeSlots = (date: Date) => {
+    const dayBookings = getBookingsForDate(date);
+    
+    if (dayBookings.length === 0) {
+      return ['morning', 'afternoon', 'full_day']; // ว่างทั้งหมด
+    }
+
+    const bookedSlots = dayBookings.map(booking => booking.timeSlot);
+    const hasFullDay = bookedSlots.includes('full_day');
+    const hasMorning = bookedSlots.includes('morning');
+    const hasAfternoon = bookedSlots.includes('afternoon');
+
+    if (hasFullDay) {
+      return []; // เต็มแล้ว
+    }
+
+    const availableSlots = [];
+    if (!hasMorning) availableSlots.push('morning');
+    if (!hasAfternoon) availableSlots.push('afternoon');
+    
+    // ถ้าทั้งเช้าและบ่ายว่าง ให้เพิ่มตัวเลือกเต็มวัน
+    if (!hasMorning && !hasAfternoon) {
+      availableSlots.push('full_day');
+    }
+
+    return availableSlots;
   };
 
 
@@ -87,6 +121,7 @@ export function Calendar({ selectedRoomId, onDateClick, onBookingClick }: Calend
 
   const renderBookingIndicator = (date: Date) => {
     const dayBookings = getBookingsForDate(date);
+    const availableSlots = getAvailableTimeSlots(date);
     
     if (dayBookings.length === 0) {
       return (
@@ -96,9 +131,7 @@ export function Calendar({ selectedRoomId, onDateClick, onBookingClick }: Calend
       );
     }
 
-    const status = getRoomAvailabilityStatus(date);
-    
-    if (status === 'full') {
+    if (availableSlots.length === 0) {
       return (
         <div className="text-center text-red-600 font-bold text-xs md:text-sm">
           เต็ม
@@ -106,9 +139,28 @@ export function Calendar({ selectedRoomId, onDateClick, onBookingClick }: Calend
       );
     }
 
+    // แสดงรายละเอียดครึ่งวัน
+    const bookedSlots = dayBookings.map(booking => booking.timeSlot);
+    const hasMorning = bookedSlots.includes('morning');
+    const hasAfternoon = bookedSlots.includes('afternoon');
+    const hasFullDay = bookedSlots.includes('full_day');
+
+    if (hasFullDay) {
+      return (
+        <div className="text-center text-red-600 font-bold text-xs md:text-sm">
+          เต็มวัน
+        </div>
+      );
+    }
+
     return (
-      <div className="text-center text-yellow-600 font-bold text-xs md:text-sm">
-        จองแล้ว
+      <div className="text-center text-xs md:text-sm">
+        <div className={`font-bold ${hasMorning ? 'text-red-600' : 'text-green-600'}`}>
+          {hasMorning ? '🔴 เช้า' : '🟢 เช้า'}
+        </div>
+        <div className={`font-bold ${hasAfternoon ? 'text-red-600' : 'text-green-600'}`}>
+          {hasAfternoon ? '🔴 บ่าย' : '🟢 บ่าย'}
+        </div>
       </div>
     );
   };
@@ -157,9 +209,14 @@ export function Calendar({ selectedRoomId, onDateClick, onBookingClick }: Calend
                 : 'bg-gray-50 text-slate-500 opacity-60 hover:bg-gray-100 border-slate-300'
             )}
             onClick={() => {
+              const availableSlots = getAvailableTimeSlots(day);
               const dayBookings = getBookingsForDate(day);
-              if (dayBookings.length > 0) {
-                // ถ้ามีการจอง ให้แสดง modal ของการจองแรก
+              
+              if (availableSlots.length > 0) {
+                // ถ้ายังมีช่วงเวลาว่าง ให้เปิดฟอร์มจองใหม่
+                onDateClick(day);
+              } else if (dayBookings.length > 0) {
+                // ถ้าเต็มแล้ว ให้แสดงรายละเอียดการจองแรก
                 onBookingClick(dayBookings[0]);
               } else {
                 // ถ้าไม่มีการจอง ให้เปิดฟอร์มจอง

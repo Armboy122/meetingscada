@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Check, X, Edit, Eye, Trash2, Building, BarChart3, Users, LogOut, Key } from 'lucide-react';
+import { ArrowLeft, Check, X, Edit, Eye, Trash2, Building, BarChart3, Users, Key } from 'lucide-react';
 import { useBookings, useApproveBooking, useRejectBooking, useUpdateBooking, useDeleteBooking } from '../hooks/useBookings';
 import { useAuth } from '../contexts/AuthContext';
 import { EditBookingModal } from './EditBookingModal';
@@ -187,14 +187,6 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
               >
                 <Key className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="font-medium text-sm sm:text-base hidden sm:inline">เปลี่ยนรหัสผ่าน</span>
-              </button>
-              
-              <button
-                onClick={logout}
-                className="flex items-center space-x-2 px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-red-100 to-rose-100 hover:from-red-200 hover:to-rose-200 text-red-700 hover:text-red-800 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 border border-red-200 hover:border-red-300"
-              >
-                <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="font-medium text-sm sm:text-base hidden sm:inline">ออกจากระบบ</span>
               </button>
             </div>
           </div>

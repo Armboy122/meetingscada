@@ -42,12 +42,21 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
 
   const needBreak = watch('needBreak');
 
+  // ฟังก์ชันหา default time slot ที่ยังว่าง
+  const getDefaultTimeSlot = (dateString: string): TimeSlot => {
+    if (isTimeSlotAvailableForDate(dateString, 'morning')) return 'morning';
+    if (isTimeSlotAvailableForDate(dateString, 'afternoon')) return 'afternoon';
+    if (isTimeSlotAvailableForDate(dateString, 'full_day')) return 'full_day';
+    return 'morning'; // fallback
+  };
+
   // Initialize booking days when modal opens
   useEffect(() => {
     if (isOpen && selectedDate) {
+      const dateString = format(selectedDate, 'yyyy-MM-dd');
       const initialDay: BookingDay = {
-        date: format(selectedDate, 'yyyy-MM-dd'),
-        timeSlot: 'morning'
+        date: dateString,
+        timeSlot: getDefaultTimeSlot(dateString)
       };
       setBookingDays([initialDay]);
       setValue('dates', [initialDay.date]);
@@ -115,7 +124,7 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
     
     const newDay: BookingDay = {
       date: nextDate,
-      timeSlot: 'morning'
+      timeSlot: getDefaultTimeSlot(nextDate)
     };
     
     const updatedDays = [...bookingDays, newDay];

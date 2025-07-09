@@ -50,10 +50,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const verifyToken = useCallback(async (authToken: string) => {
     try {
-      const response = await fetch('https://cfw-bun-hono-drizzle.apiarm.workers.dev/auth/me', {
+      // ใช้ proxy ใน development หรือ production URL โดยตรง
+      const apiUrl = import.meta.env.DEV ? '/api/auth/me' : 'https://cfw-bun-hono-drizzle.apiarm.workers.dev/auth/me';
+      const response = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${authToken}`
-        }
+        },
+        signal: AbortSignal.timeout(10000) // 10 second timeout
       });
 
       if (!response.ok) {
@@ -89,13 +92,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = async (username: string, password: string): Promise<void> => {
     try {
-      const response = await fetch('https://cfw-bun-hono-drizzle.apiarm.workers.dev/auth/login', {
+      const apiUrl = import.meta.env.DEV ? '/api/auth/login' : 'https://cfw-bun-hono-drizzle.apiarm.workers.dev/auth/login';
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, password }),
+        signal: AbortSignal.timeout(10000) // 10 second timeout
       });
+
+      // ตรวจสอบว่าเป็น JSON response หรือไม่
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('เซิร์ฟเวอร์ไม่สามารถใช้งานได้ในขณะนี้ กรุณาลองอีกครั้งในภายหลัง');
+      }
 
       const data: LoginResponse = await response.json();
 
@@ -110,11 +121,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setToken(authToken);
         setAdmin(adminData);
         setIsAuthenticated(true);
+        
+        console.log('✅ Login successful');
       } else {
         throw new Error(data.message);
       }
     } catch (error) {
       console.error('Login error:', error);
+      
+      // ตรวจสอบว่าเป็น network error หรือ server error
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
+      } else if (error instanceof SyntaxError && error.message.includes('JSON')) {
+        throw new Error('เซิร์ฟเวอร์ส่งข้อมูลผิดรูปแบบ กรุณาลองอีกครั้งในภายหลัง');
+      } else if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('การเชื่อมต่อหมดเวลา กรุณาลองอีกครั้งในภายหลัง');
+      }
+      
       throw error;
     }
   };
