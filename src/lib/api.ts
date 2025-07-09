@@ -1,10 +1,8 @@
 import type { APIResponse, MeetingRoom, Booking, BookingFormData, ApprovalData, Admin } from '../types';
 import type { HistoryResponse, HistorySummary, BookingHistoryResponse } from '../types/history';
 
-// Auto-detect API base URL
-const API_BASE_URL = import.meta.env.DEV 
-  ? '/api'  // Development: ใช้ proxy
-  : 'https://cfw-bun-hono-drizzle.apiarm.workers.dev';  // Production: ใช้ Cloudflare Workers URL
+// ใช้ Cloudflare Workers URL โดยตรงในทุกกรณี
+const API_BASE_URL = 'https://cfw-bun-hono-drizzle.apiarm.workers.dev';
 
 class APIClient {
   private baseURL: string;

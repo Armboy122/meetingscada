@@ -1,15 +1,23 @@
 import { useState } from 'react';
-import { ArrowLeft, Check, X, Edit, Eye, Trash2 } from 'lucide-react';
+import { ArrowLeft, Check, X, Edit, Eye, Trash2, Building, BarChart3 } from 'lucide-react';
 import { useBookings, useApproveBooking, useRejectBooking, useUpdateBooking, useDeleteBooking } from '../hooks/useBookings';
 import { EditBookingModal } from './EditBookingModal';
 import { formatDate, getTimeSlotLabel, getStatusLabel, getStatusColor } from '../lib/utils';
 import type { Booking, BookingFormData } from '../types';
 
+// Import new components
+import { RoomManagement } from './RoomManagement';
+import { AdminManagement } from './AdminManagement';
+import { HistoryReports } from './HistoryReports';
+
 interface AdminDashboardProps {
   onBack: () => void;
 }
 
+type AdminTab = 'bookings' | 'rooms' | 'admins' | 'reports';
+
 export function AdminDashboard({ onBack }: AdminDashboardProps) {
+  const [activeTab, setActiveTab] = useState<AdminTab>('bookings');
   const [selectedStatus, setSelectedStatus] = useState<string>('pending');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -111,6 +119,12 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
     { key: '', label: 'ทั้งหมด', count: allBookings.length },
   ];
 
+  const adminTabs = [
+    { key: 'bookings', label: 'จัดการการจอง', icon: Check, count: allBookings.filter(b => b.status === 'pending').length },
+    { key: 'rooms', label: 'จัดการห้องประชุม', icon: Building },
+    { key: 'reports', label: 'รายงานและประวัติ', icon: BarChart3 },
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-lavender-50 to-violet-50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
@@ -126,279 +140,320 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
             </button>
             <div>
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-800">Admin Dashboard</h1>
-              <p className="text-sm sm:text-base text-slate-600 mt-1 sm:mt-2">จัดการการจองห้องประชุม</p>
+              <p className="text-sm sm:text-base text-slate-600 mt-1 sm:mt-2">จัดการระบบจองห้องประชุม</p>
             </div>
           </div>
         </div>
 
-        {/* Status Tabs */}
+        {/* Admin Tabs */}
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl border border-purple-100/50 p-2 mb-6 sm:mb-8">
           <div className="flex space-x-1 sm:space-x-2 overflow-x-auto scrollbar-hide">
-            {statusTabs.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setSelectedStatus(tab.key)}
-                className={`px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium rounded-xl sm:rounded-2xl transition-all duration-200 whitespace-nowrap min-w-fit ${
-                  selectedStatus === tab.key
-                    ? 'bg-gradient-to-r from-purple-500 to-violet-500 text-white shadow-lg'
-                    : 'text-slate-600 hover:text-purple-600 hover:bg-purple-50'
-                }`}
-              >
-                <span className="hidden sm:inline">{tab.label}</span>
-                <span className="sm:hidden">{tab.label.replace('รออนุมัติ', 'รอ').replace('อนุมัติแล้ว', 'ผ่าน').replace('ปฏิเสธ', 'ไม่ผ่าน').replace('ทั้งหมด', 'ทั้งหมด')}</span>
-                <span className={`ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs rounded-full ${
-                  selectedStatus === tab.key
-                    ? 'bg-white/20 text-white'
-                    : 'bg-purple-100 text-purple-600'
-                }`}>
-                  {tab.count}
-                </span>
-              </button>
-            ))}
+            {adminTabs.map(tab => {
+              const IconComponent = tab.icon;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key as AdminTab)}
+                  className={`flex items-center space-x-2 px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium rounded-xl sm:rounded-2xl transition-all duration-200 whitespace-nowrap min-w-fit ${
+                    activeTab === tab.key
+                      ? 'bg-gradient-to-r from-purple-500 to-violet-500 text-white shadow-lg'
+                      : 'text-slate-600 hover:text-purple-600 hover:bg-purple-50'
+                  }`}
+                >
+                  <IconComponent className="w-4 h-4" />
+                  <span>{tab.label}</span>
+                  {tab.count && tab.count > 0 && (
+                    <span className={`ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs rounded-full ${
+                      activeTab === tab.key
+                        ? 'bg-white/20 text-white'
+                        : 'bg-purple-100 text-purple-600'
+                    }`}>
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Bookings List */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl border border-purple-100/50 overflow-hidden">
-          {/* Mobile Cards View */}
-          <div className="block sm:hidden">
-            {bookings.map(booking => (
-              <div key={booking.id} className="border-b border-purple-100 p-4 last:border-b-0">
-                {/* วันที่และช่วงเวลา - ขนาดใหญ่ที่สุด */}
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <div className="text-lg font-bold text-slate-800">
-                      {booking.dates && booking.dates.length > 0 ? formatDate(booking.dates[0].bookingDate) : formatDate(booking.createdAt)}
-                    </div>
-                    <div className="text-base font-semibold text-purple-600 mt-1">
-                      {getTimeSlotLabel(booking.timeSlot)}
-                    </div>
-                  </div>
-                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(booking.status)}`}>
-                    {getStatusLabel(booking.status)}
-                  </span>
-                </div>
-                
-                {/* ข้อมูลตามลำดับที่ต้องการ */}
-                <div className="space-y-2 mb-4">
-                  {/* ห้องประชุม */}
-                  <div className="text-sm font-medium text-slate-700">
-                    📍 {booking.roomName || booking.room?.roomName}
-                  </div>
-                  
-                  {/* หัวข้อการประชุม */}
-                  {booking.meetingTitle && (
-                    <div className="text-sm text-slate-600">
-                      💼 {booking.meetingTitle}
-                    </div>
-                  )}
-                  
-                  {/* ผู้จอง */}
-                  <div className="text-sm text-slate-600">
-                    👤 {booking.bookerName}
-                  </div>
-                  
-                  {/* เบอร์ผู้จอง */}
-                  <div className="text-sm text-slate-600">
-                    📞 {booking.phoneNumber}
-                  </div>
-                  
-                  {/* ข้อมูลเบรค */}
-                  {booking.needBreak && (
-                    <div className="text-sm text-orange-600 font-medium">
-                      ☕ ต้องการเบรค{booking.breakDetails ? `: ${booking.breakDetails}` : ''}
-                    </div>
-                  )}
-                  
-                  {/* รหัสการจอง */}
-                  <div className="text-xs text-slate-500">
-                    🔖 {booking.bookingCode}
-                  </div>
-                </div>
-                
-                <div className="flex justify-end space-x-2">
+        {/* Tab Content */}
+        {activeTab === 'bookings' && (
+          <>
+            {/* Status Tabs */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl border border-purple-100/50 p-2 mb-6 sm:mb-8">
+              <div className="flex space-x-1 sm:space-x-2 overflow-x-auto scrollbar-hide">
+                {statusTabs.map(tab => (
                   <button
-                    onClick={() => {
-                      setSelectedBooking(booking);
-                      setShowModal(true);
-                      setActionType('approve');
-                    }}
-                    className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all duration-200"
-                    title="ดูรายละเอียด"
+                    key={tab.key}
+                    onClick={() => setSelectedStatus(tab.key)}
+                    className={`px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium rounded-xl sm:rounded-2xl transition-all duration-200 whitespace-nowrap min-w-fit ${
+                      selectedStatus === tab.key
+                        ? 'bg-gradient-to-r from-purple-500 to-violet-500 text-white shadow-lg'
+                        : 'text-slate-600 hover:text-purple-600 hover:bg-purple-50'
+                    }`}
                   >
-                    <Eye className="w-4 h-4" />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                    <span className="sm:hidden">{tab.label.replace('รออนุมัติ', 'รอ').replace('อนุมัติแล้ว', 'ผ่าน').replace('ปฏิเสธ', 'ไม่ผ่าน').replace('ทั้งหมด', 'ทั้งหมด')}</span>
+                    <span className={`ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs rounded-full ${
+                      selectedStatus === tab.key
+                        ? 'bg-white/20 text-white'
+                        : 'bg-purple-100 text-purple-600'
+                    }`}>
+                      {tab.count}
+                    </span>
                   </button>
-                  
-                  {/* ปุ่มแก้ไข - ใช้ได้ทุกสถานะ */}
-                  <button
-                    onClick={() => handleEdit(booking)}
-                    className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-all duration-200"
-                    title="แก้ไขข้อมูล"
-                  >
-                    <Edit className="w-3 h-3" />
-                  </button>
-                  
-                  {/* ปุ่มลบ - ใช้ได้ทุกสถานะ */}
-                  <button
-                    onClick={() => handleDelete(booking)}
-                    className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
-                    title="ลบข้อมูล"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                  
-                  {/* ปุ่มอนุมัติ/ปฏิเสธ - เฉพาะสถานะ pending */}
-                  {booking.status === 'pending' && (
-                    <>
-                      <button
-                        onClick={() => handleApprove(booking)}
-                        className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-all duration-200"
-                        title="อนุมัติ"
-                      >
-                        <Check className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => handleReject(booking)}
-                        className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
-                        title="ปฏิเสธ"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </>
-                  )}
-                </div>
+                ))}
               </div>
-            ))}
-            {bookings.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-slate-500 text-sm">ไม่มีข้อมูลการจอง</p>
-              </div>
-            )}
-          </div>
-          
-          {/* Desktop Table View */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-purple-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    วันที่และเวลา
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    ห้องประชุม
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    ผู้จอง
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    สถานะ
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    จัดการ
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+            </div>
+
+            {/* Bookings List */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl border border-purple-100/50 overflow-hidden">
+              {/* Mobile Cards View */}
+              <div className="block sm:hidden">
                 {bookings.map(booking => (
-                  <tr key={booking.id} className="hover:bg-purple-25 transition-colors duration-200">
-                    {/* วันที่และเวลา */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-bold text-slate-800">
-                        {booking.dates && booking.dates.length > 0 ? formatDate(booking.dates[0].bookingDate) : formatDate(booking.createdAt)}
-                      </div>
-                      <div className="text-sm font-medium text-purple-600">
-                        {getTimeSlotLabel(booking.timeSlot)}
-                      </div>
-                    </td>
-                    
-                    {/* ห้องประชุม */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-800">
-                      📍 {booking.roomName || booking.room?.roomName}
-                    </td>
-                    
-                    {/* ผู้จอง */}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-slate-900">👤 {booking.bookerName}</div>
-                      <div className="text-sm text-slate-600">📞 {booking.phoneNumber}</div>
-                      {booking.needBreak && (
-                        <div className="text-xs text-orange-600 font-medium mt-1">
-                          ☕ ต้องการเบรค{booking.breakDetails ? `: ${booking.breakDetails}` : ''}
+                  <div key={booking.id} className="border-b border-purple-100 p-4 last:border-b-0">
+                    {/* วันที่และช่วงเวลา - ขนาดใหญ่ที่สุด */}
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <div className="text-lg font-bold text-slate-800">
+                          {booking.dates && booking.dates.length > 0 ? formatDate(booking.dates[0].bookingDate) : formatDate(booking.createdAt)}
                         </div>
-                      )}
-                    </td>
-                    
-                    {/* สถานะ */}
-                    <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-base font-semibold text-purple-600 mt-1">
+                          {getTimeSlotLabel(booking.timeSlot)}
+                        </div>
+                      </div>
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(booking.status)}`}>
                         {getStatusLabel(booking.status)}
                       </span>
-                    </td>
+                    </div>
                     
-                    {/* จัดการ */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => {
-                            setSelectedBooking(booking);
-                            setShowModal(true);
-                            setActionType('approve');
-                          }}
-                          className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all duration-200"
-                          title="ดูรายละเอียด"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        
-                        {/* ปุ่มแก้ไข - ใช้ได้ทุกสถานะ */}
-                        <button
-                          onClick={() => handleEdit(booking)}
-                          className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-all duration-200"
-                          title="แก้ไขข้อมูล"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        
-                        {/* ปุ่มลบ - ใช้ได้ทุกสถานะ */}
-                        <button
-                          onClick={() => handleDelete(booking)}
-                          className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
-                          title="ลบข้อมูล"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                        
-                        {/* ปุ่มอนุมัติ/ปฏิเสธ - เฉพาะสถานะ pending */}
-                        {booking.status === 'pending' && (
-                          <>
-                            <button
-                              onClick={() => handleApprove(booking)}
-                              className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-all duration-200"
-                              title="อนุมัติ"
-                            >
-                              <Check className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleReject(booking)}
-                              className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
-                              title="ปฏิเสธ"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
+                    {/* ข้อมูลตามลำดับที่ต้องการ */}
+                    <div className="space-y-2 mb-4">
+                      {/* ห้องประชุม */}
+                      <div className="text-sm font-medium text-slate-700">
+                        📍 {booking.roomName || booking.room?.roomName}
                       </div>
-                    </td>
-                  </tr>
+                      
+                      {/* หัวข้อการประชุม */}
+                      {booking.meetingTitle && (
+                        <div className="text-sm text-slate-600">
+                          💼 {booking.meetingTitle}
+                        </div>
+                      )}
+                      
+                      {/* ผู้จอง */}
+                      <div className="text-sm text-slate-600">
+                        👤 {booking.bookerName}
+                      </div>
+                      
+                      {/* เบอร์ผู้จอง */}
+                      <div className="text-sm text-slate-600">
+                        📞 {booking.phoneNumber}
+                      </div>
+                      
+                      {/* ข้อมูลเบรค */}
+                      {booking.needBreak && (
+                        <div className="text-sm text-orange-600 font-medium">
+                          ☕ ต้องการเบรค{booking.breakDetails ? `: ${booking.breakDetails}` : ''}
+                        </div>
+                      )}
+                      
+                      {/* รหัสการจอง */}
+                      <div className="text-xs text-slate-500">
+                        🔖 {booking.bookingCode}
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={() => {
+                          setSelectedBooking(booking);
+                          setShowModal(true);
+                          setActionType('approve');
+                        }}
+                        className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                        title="ดูรายละเอียด"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      
+                      {/* ปุ่มแก้ไข - ใช้ได้ทุกสถานะ */}
+                      <button
+                        onClick={() => handleEdit(booking)}
+                        className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-all duration-200"
+                        title="แก้ไขข้อมูล"
+                      >
+                        <Edit className="w-3 h-3" />
+                      </button>
+                      
+                      {/* ปุ่มลบ - ใช้ได้ทุกสถานะ */}
+                      <button
+                        onClick={() => handleDelete(booking)}
+                        className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
+                        title="ลบข้อมูล"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                      
+                      {/* ปุ่มอนุมัติ/ปฏิเสธ - เฉพาะสถานะ pending */}
+                      {booking.status === 'pending' && (
+                        <>
+                          <button
+                            onClick={() => handleApprove(booking)}
+                            className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-all duration-200"
+                            title="อนุมัติ"
+                          >
+                            <Check className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => handleReject(booking)}
+                            className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
+                            title="ปฏิเสธ"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-            {bookings.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-slate-500 text-lg">ไม่มีข้อมูลการจอง</p>
+                {bookings.length === 0 && (
+                  <div className="text-center py-12">
+                    <p className="text-slate-500 text-sm">ไม่มีข้อมูลการจอง</p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+              
+              {/* Desktop Table View */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-purple-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        วันที่และเวลา
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        ห้องประชุม
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        ผู้จอง
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        สถานะ
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        จัดการ
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {bookings.map(booking => (
+                      <tr key={booking.id} className="hover:bg-purple-25 transition-colors duration-200">
+                        {/* วันที่และเวลา */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-bold text-slate-800">
+                            {booking.dates && booking.dates.length > 0 ? formatDate(booking.dates[0].bookingDate) : formatDate(booking.createdAt)}
+                          </div>
+                          <div className="text-sm font-medium text-purple-600">
+                            {getTimeSlotLabel(booking.timeSlot)}
+                          </div>
+                        </td>
+                        
+                        {/* ห้องประชุม */}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-800">
+                          📍 {booking.roomName || booking.room?.roomName}
+                        </td>
+                        
+                        {/* ผู้จอง */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-slate-900">👤 {booking.bookerName}</div>
+                          <div className="text-sm text-slate-600">📞 {booking.phoneNumber}</div>
+                          {booking.needBreak && (
+                            <div className="text-xs text-orange-600 font-medium mt-1">
+                              ☕ ต้องการเบรค{booking.breakDetails ? `: ${booking.breakDetails}` : ''}
+                            </div>
+                          )}
+                        </td>
+                        
+                        {/* สถานะ */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(booking.status)}`}>
+                            {getStatusLabel(booking.status)}
+                          </span>
+                        </td>
+                        
+                        {/* จัดการ */}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => {
+                                setSelectedBooking(booking);
+                                setShowModal(true);
+                                setActionType('approve');
+                              }}
+                              className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                              title="ดูรายละเอียด"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            
+                            {/* ปุ่มแก้ไข - ใช้ได้ทุกสถานะ */}
+                            <button
+                              onClick={() => handleEdit(booking)}
+                              className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-all duration-200"
+                              title="แก้ไขข้อมูล"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            
+                            {/* ปุ่มลบ - ใช้ได้ทุกสถานะ */}
+                            <button
+                              onClick={() => handleDelete(booking)}
+                              className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
+                              title="ลบข้อมูล"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                            
+                            {/* ปุ่มอนุมัติ/ปฏิเสธ - เฉพาะสถานะ pending */}
+                            {booking.status === 'pending' && (
+                              <>
+                                <button
+                                  onClick={() => handleApprove(booking)}
+                                  className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-all duration-200"
+                                  title="อนุมัติ"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleReject(booking)}
+                                  className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
+                                  title="ปฏิเสธ"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {bookings.length === 0 && (
+                  <div className="text-center py-12">
+                    <p className="text-slate-500 text-lg">ไม่มีข้อมูลการจอง</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'rooms' && <RoomManagement />}
+        {activeTab === 'admins' && <AdminManagement />}
+        {activeTab === 'reports' && <HistoryReports />}
 
         {/* Modal */}
         {showModal && selectedBooking && (

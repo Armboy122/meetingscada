@@ -40,6 +40,13 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
     setValue('roomId', selectedRoomId);
   }, [selectedRoomId, setValue]);
 
+  // Update dates when selectedDate prop changes
+  useEffect(() => {
+    if (selectedDate) {
+      setValue('dates', [format(selectedDate, 'yyyy-MM-dd')]);
+    }
+  }, [selectedDate, setValue]);
+
   // ตรวจสอบช่วงเวลาที่จองไปแล้วในวันที่เลือก
   const bookedTimeSlots = useMemo(() => {
     if (!selectedDate || !existingBookings.length) return [];
@@ -309,7 +316,7 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
             </div>
           </div>
 
-          {needBreak && (
+          {(needBreak === true || needBreak === "true") && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 รายละเอียดอาหารที่ต้องการ
