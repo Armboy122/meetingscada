@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Settings } from 'lucide-react';
 import { useRooms } from './hooks/useRooms';
 import { useBookings } from './hooks/useBookings';
+import { useAuth } from './contexts/AuthContext';
 import { Calendar } from './components/Calendar';
 import { RoomTabs } from './components/RoomTabs';
 import { BookingModal } from './components/BookingModal';
@@ -13,6 +14,7 @@ import type { Booking } from './types';
 function App() {
   const { data: rooms = [] } = useRooms();
   const { data: allBookings = [] } = useBookings({}); // ดึงข้อมูลทั้งหมดสำหรับ count pending
+  const { isAuthenticated, loading, logout } = useAuth();
   const [selectedRoomId, setSelectedRoomId] = useState<number>(1);
   
   useEffect(() => {
@@ -25,7 +27,6 @@ function App() {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isBookingFormOpen, setIsBookingFormOpen] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
 
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
@@ -43,15 +44,29 @@ function App() {
   };
 
   const handleAdminLoginSuccess = () => {
-    setIsAdminLoggedIn(true);
+    // ไม่ต้องทำอะไร เพราะ AuthContext จัดการให้แล้ว
   };
 
   const handleAdminLogout = () => {
-    setIsAdminLoggedIn(false);
+    logout();
     setShowAdmin(false);
   };
 
-  if (showAdmin && !isAdminLoggedIn) {
+  // แสดง loading ระหว่างตรวจสอบ authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-lavender-50 to-violet-50 flex items-center justify-center">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-purple-100/50 p-8">
+          <div className="flex items-center space-x-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-4 border-purple-500 border-t-transparent"></div>
+            <span className="text-lg text-slate-600">กำลังโหลดระบบ...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (showAdmin && !isAuthenticated) {
     return (
       <AdminLogin
         onSuccess={handleAdminLoginSuccess}
@@ -60,7 +75,7 @@ function App() {
     );
   }
 
-  if (showAdmin && isAdminLoggedIn) {
+  if (showAdmin && isAuthenticated) {
     return <AdminDashboard onBack={handleAdminLogout} />;
   }
 

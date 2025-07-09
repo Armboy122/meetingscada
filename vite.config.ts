@@ -11,6 +11,8 @@ export default defineConfig({
         target: 'https://cfw-bun-hono-drizzle.apiarm.workers.dev',  // ใช้ production API
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
+        secure: false,
+        ws: true,
       },
     },
   },

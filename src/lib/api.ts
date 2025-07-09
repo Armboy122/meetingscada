@@ -1,8 +1,8 @@
 import type { APIResponse, MeetingRoom, Booking, BookingFormData, ApprovalData, Admin } from '../types';
 import type { HistoryResponse, HistorySummary, BookingHistoryResponse } from '../types/history';
 
-// ใช้ Cloudflare Workers URL โดยตรงในทุกกรณี
-const API_BASE_URL = 'https://cfw-bun-hono-drizzle.apiarm.workers.dev';
+// ใช้ proxy ในระหว่างการพัฒนา และ Cloudflare Workers URL ใน production
+const API_BASE_URL = import.meta.env.DEV ? '/api' : 'https://cfw-bun-hono-drizzle.apiarm.workers.dev';
 
 class APIClient {
   private baseURL: string;
@@ -26,42 +26,73 @@ class APIClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retries: number = 3
   ): Promise<APIResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
     
-    const response = await fetch(url, {
+    const requestOptions: RequestInit = {
       headers: {
         ...this.getAuthHeaders(),
         ...options.headers,
       },
+      mode: 'cors',
+      credentials: 'omit',
       ...options,
-    });
+    };
 
-    // Handle 401 Unauthorized - redirect to login
-    if (response.status === 401) {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('adminData');
-      window.location.href = '/';
-      throw new Error('กรุณาเข้าสู่ระบบใหม่');
-    }
-
-    if (!response.ok) {
-      let errorMessage = `HTTP error! status: ${response.status}`;
-      
+    for (let i = 0; i < retries; i++) {
       try {
-        const errorData = await response.json();
-        if (errorData && errorData.message) {
-          errorMessage = errorData.message;
+        const response = await fetch(url, requestOptions);
+
+        // Handle 401 Unauthorized - redirect to login
+        if (response.status === 401) {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('adminData');
+          window.location.href = '/';
+          throw new Error('กรุณาเข้าสู่ระบบใหม่');
         }
-      } catch {
-        // Fall back to generic error message if JSON parsing fails
+
+        // Retry on 503 Service Unavailable
+        if (response.status === 503 && i < retries - 1) {
+          console.log(`Retrying request (${i + 1}/${retries}) after 503 error...`);
+          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // exponential backoff
+          continue;
+        }
+
+        if (!response.ok) {
+          let errorMessage = `HTTP error! status: ${response.status}`;
+          
+          try {
+            const errorData = await response.json();
+            if (errorData && errorData.message) {
+              errorMessage = errorData.message;
+            }
+          } catch {
+            // Fall back to generic error message if JSON parsing fails
+          }
+          
+          throw new Error(errorMessage);
+        }
+
+        return response.json();
+      } catch (error) {
+        if (i === retries - 1) {
+          throw error;
+        }
+        
+        // Retry on network errors
+        if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+          console.log(`Retrying request (${i + 1}/${retries}) after network error...`);
+          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // exponential backoff
+          continue;
+        }
+        
+        throw error;
       }
-      
-      throw new Error(errorMessage);
     }
 
-    return response.json();
+    throw new Error('Maximum retries exceeded');
   }
 
   // Health Check API

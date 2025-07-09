@@ -31,7 +31,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
 
   const { data: bookings = [], refetch } = useBookings({ status: selectedStatus });
   const { data: allBookings = [], refetch: refetchAll } = useBookings({}); // ดึงข้อมูลทั้งหมดสำหรับ count
-  const { admin: currentUser, logout, loading: authLoading } = useAuth(); // ใช้ current user จาก Auth Context
+  const { admin: currentUser, loading: authLoading } = useAuth(); // ใช้ current user จาก Auth Context
   const approveBooking = useApproveBooking();
   const rejectBooking = useRejectBooking();
   const updateBooking = useUpdateBooking();
