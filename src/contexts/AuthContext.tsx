@@ -14,7 +14,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   admin: Admin | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
   token: string | null;
 }
@@ -41,8 +41,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(null);
 
   const logout = useCallback(() => {
+    // ลบข้อมูลจากทั้ง localStorage และ sessionStorage
     localStorage.removeItem('authToken');
     localStorage.removeItem('adminData');
+    localStorage.removeItem('loginTimestamp');
+    sessionStorage.removeItem('authToken');
+    sessionStorage.removeItem('adminData');
+    sessionStorage.removeItem('loginTimestamp');
+    
     setToken(null);
     setAdmin(null);
     setIsAuthenticated(false);
@@ -101,14 +107,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // จะ logout เฉพาะเมื่อได้ 401 Unauthorized เท่านั้น
   }, [logout]);
 
+  // ตรวจสอบว่า login หมดอายุหรือไม่ (24 ชั่วโมง)
+  const isLoginExpired = useCallback(() => {
+    const loginTimestamp = localStorage.getItem('loginTimestamp') || sessionStorage.getItem('loginTimestamp');
+    if (!loginTimestamp) return true;
+    
+    const oneDay = 24 * 60 * 60 * 1000; // 24 ชั่วโมงในหน่วย milliseconds
+    const now = Date.now();
+    const loginTime = parseInt(loginTimestamp);
+    
+    return (now - loginTime) > oneDay;
+  }, []);
+
   // Check for existing auth on mount
   useEffect(() => {
     const initializeAuth = async () => {
-      const storedToken = localStorage.getItem('authToken');
-      const storedAdmin = localStorage.getItem('adminData');
+      // ตรวจสอบทั้ง localStorage และ sessionStorage
+      const localToken = localStorage.getItem('authToken');
+      const sessionToken = sessionStorage.getItem('authToken');
+      const localAdmin = localStorage.getItem('adminData');
+      const sessionAdmin = sessionStorage.getItem('adminData');
+
+      const storedToken = localToken || sessionToken;
+      const storedAdmin = localAdmin || sessionAdmin;
 
       if (storedToken && storedAdmin) {
         try {
+          // ตรวจสอบว่า login หมดอายุหรือไม่
+          if (isLoginExpired()) {
+            console.log('🕐 Login session expired (24+ hours), logging out...');
+            logout();
+            setLoading(false);
+            return;
+          }
+
           const adminData = JSON.parse(storedAdmin);
           
           // ตั้งค่า state ก่อน
@@ -130,9 +162,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     initializeAuth();
-  }, [verifyToken, logout]);
+  }, [verifyToken, logout, isLoginExpired]);
 
-  const login = async (username: string, password: string): Promise<void> => {
+  const login = async (username: string, password: string, rememberMe: boolean = false): Promise<void> => {
     const maxRetries = 3;
     let lastError: Error | null = null;
 
@@ -161,16 +193,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (data.success) {
           const { token: authToken, admin: adminData } = data.data;
           
-          // Store in localStorage
-          localStorage.setItem('authToken', authToken);
-          localStorage.setItem('adminData', JSON.stringify(adminData));
+          // เลือกใช้ localStorage หรือ sessionStorage ตาม rememberMe
+          const storage = rememberMe ? localStorage : sessionStorage;
+          const currentTime = Date.now().toString();
+          
+          // Store in selected storage
+          storage.setItem('authToken', authToken);
+          storage.setItem('adminData', JSON.stringify(adminData));
+          storage.setItem('loginTimestamp', currentTime);
           
           // Update state
           setToken(authToken);
           setAdmin(adminData);
           setIsAuthenticated(true);
           
-          console.log('✅ Login successful');
+          console.log(`✅ Login successful (${rememberMe ? 'persistent' : 'session only'})`);
           return; // สำเร็จ ออกจาก loop
         } else {
           throw new Error(data.message);

@@ -1,30 +1,32 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Lock, User, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { adminLoginSchema, type AdminLoginData } from '../schemas';
 
 interface AdminLoginProps {
   onBack: () => void;
   onSuccess: () => void;
 }
 
-interface LoginFormData {
-  username: string;
-  password: string;
-}
-
 export function AdminLogin({ onBack, onSuccess }: AdminLoginProps) {
   const { login } = useAuth();
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>();
+  const { register, handleSubmit, formState: { errors } } = useForm<AdminLoginData>({
+    resolver: zodResolver(adminLoginSchema),
+    defaultValues: {
+      rememberMe: false
+    }
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const onSubmit = async (data: LoginFormData) => {
+  const onSubmit = async (data: AdminLoginData) => {
     setIsLoading(true);
     setErrorMessage('');
     
     try {
-      await login(data.username, data.password);
+      await login(data.username, data.password, data.rememberMe);
       onSuccess();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'เกิดข้อผิดพลาดที่ไม่คาดคิด');
@@ -120,6 +122,19 @@ export function AdminLogin({ onBack, onSuccess }: AdminLoginProps) {
               {errors.password && (
                 <p className="mt-1 text-xs sm:text-sm text-red-600">{errors.password.message}</p>
               )}
+            </div>
+
+            {/* Remember Me Checkbox */}
+            <div className="flex items-center">
+              <input
+                id="rememberMe"
+                type="checkbox"
+                {...register('rememberMe')}
+                className="h-4 w-4 text-purple-600 bg-white border-purple-300 rounded focus:ring-purple-500 focus:ring-2 transition-colors"
+              />
+              <label htmlFor="rememberMe" className="ml-2 block text-sm text-slate-700">
+                จำการเข้าสู่ระบบ <span className="text-xs text-slate-500">(1 วัน)</span>
+              </label>
             </div>
 
             <div className="pt-2 sm:pt-4">

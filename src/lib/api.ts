@@ -149,18 +149,9 @@ class APIClient {
   }
 
   // Bookings API (public access for creating, auth required for management)
-  async getBookings(params?: {
-    status?: string;
-    roomId?: number;
-  }): Promise<APIResponse<Booking[]>> {
-    const searchParams = new URLSearchParams();
-    if (params?.status) searchParams.append('status', params.status);
-    if (params?.roomId) searchParams.append('roomId', params.roomId.toString());
-    
-    const query = searchParams.toString();
-    const endpoint = query ? `/bookings?${query}` : '/bookings';
-    
-    return this.request<Booking[]>(endpoint);
+  // Updated to fetch all bookings without backend filtering - filtering now done on frontend
+  async getBookings(): Promise<APIResponse<Booking[]>> {
+    return this.request<Booking[]>('/bookings');
   }
 
   async getBooking(id: number): Promise<APIResponse<Booking>> {

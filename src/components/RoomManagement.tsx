@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Edit, Trash2, Users, X, Building } from 'lucide-react';
 import { useRooms, useCreateRoom, useUpdateRoom, useDeleteRoom } from '../hooks/useRooms';
+import { roomSchema, type RoomFormData } from '../schemas';
+import { formatDate } from '../lib/utils';
 import type { MeetingRoom } from '../types';
-
-interface RoomFormData {
-  roomName: string;
-  capacity: number;
-}
 
 export function RoomManagement() {
   const { data: rooms = [], isLoading, refetch } = useRooms();
@@ -25,7 +23,9 @@ export function RoomManagement() {
     handleSubmit: handleSubmitCreate,
     reset: resetCreate,
     formState: { errors: errorsCreate }
-  } = useForm<RoomFormData>();
+  } = useForm<RoomFormData>({
+    resolver: zodResolver(roomSchema)
+  });
 
   const {
     register: registerEdit,
@@ -33,7 +33,9 @@ export function RoomManagement() {
     reset: resetEdit,
     setValue: setValueEdit,
     formState: { errors: errorsEdit }
-  } = useForm<RoomFormData>();
+  } = useForm<RoomFormData>({
+    resolver: zodResolver(roomSchema)
+  });
 
   const handleCreateRoom = async (data: RoomFormData) => {
     try {
@@ -174,7 +176,7 @@ export function RoomManagement() {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-600">สร้างเมื่อ:</span>
                 <span className="text-slate-800">
-                  {new Date(room.createdAt).toLocaleDateString('th-TH')}
+                  {formatDate(room.createdAt)}
                 </span>
               </div>
             </div>

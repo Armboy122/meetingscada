@@ -1,18 +1,11 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Edit, Trash2, Users, X, Mail, User, Key, Eye } from 'lucide-react';
 import { useAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin } from '../hooks/useAdmins';
+import { adminSchema, adminUpdateSchema, type AdminFormData, type AdminUpdateData } from '../schemas';
+import { formatDate } from '../lib/utils';
 import type { Admin } from '../types';
-
-interface AdminFormData {
-  username: string;
-  fullName: string;
-  email: string;
-  password?: string;
-  confirmPassword?: string;
-  passwordHash?: string;
-  isActive?: boolean;
-}
 
 export function AdminManagement() {
   const { data: admins = [], isLoading, refetch } = useAdmins();
@@ -33,7 +26,9 @@ export function AdminManagement() {
     reset: resetCreate,
     watch: watchCreate,
     formState: { errors: errorsCreate }
-  } = useForm<AdminFormData>();
+  } = useForm<AdminFormData>({
+    resolver: zodResolver(adminSchema)
+  });
 
   const {
     register: registerEdit,
@@ -41,7 +36,9 @@ export function AdminManagement() {
     reset: resetEdit,
     setValue: setValueEdit,
     formState: { errors: errorsEdit }
-  } = useForm<AdminFormData>();
+  } = useForm<AdminUpdateData>({
+    resolver: zodResolver(adminUpdateSchema)
+  });
 
   const handleCreateAdmin = async (data: AdminFormData) => {
     try {
@@ -55,7 +52,7 @@ export function AdminManagement() {
       const adminData = {
         username: data.username,
         fullName: data.fullName,
-        email: data.email,
+        email: data.email || '',
         password: data.password // ส่ง plain text password
       };
       await createAdmin.mutateAsync(adminData);
@@ -76,7 +73,7 @@ export function AdminManagement() {
     setShowEditModal(true);
   };
 
-  const handleUpdateAdmin = async (data: AdminFormData) => {
+  const handleUpdateAdmin = async (data: AdminUpdateData) => {
     if (!selectedAdmin) return;
     
     try {
@@ -85,7 +82,7 @@ export function AdminManagement() {
         data: {
           username: data.username,
           fullName: data.fullName,
-          email: data.email,
+          email: data.email || '',
           isActive: data.isActive ?? true
         }
       });
@@ -211,11 +208,7 @@ export function AdminManagement() {
                   
                   {/* วันที่สร้าง */}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                    {new Date(admin.createdAt).toLocaleDateString('th-TH', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
+                    {formatDate(admin.createdAt)}
                   </td>
                   
                   {/* จัดการ */}

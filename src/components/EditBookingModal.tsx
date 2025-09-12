@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import { useRooms } from '../hooks/useRooms';
-
-import type { Booking, BookingFormData, TimeSlot } from '../types';
+import { bookingFormInputSchema, type BookingFormInputData, type BookingFormData } from '../schemas';
+import { formatForInput } from '../lib/utils';
+import type { Booking, TimeSlot } from '../types';
 
 interface EditBookingModalProps {
   booking: Booking | null;
@@ -29,7 +31,9 @@ export function EditBookingModal({ booking, isOpen, onClose, onSave }: EditBooki
     setValue,
     reset,
     formState: { errors }
-  } = useForm<BookingFormData>();
+  } = useForm<BookingFormInputData>({
+    resolver: zodResolver(bookingFormInputSchema)
+  });
 
   useEffect(() => {
     if (booking && isOpen) {
@@ -38,6 +42,10 @@ export function EditBookingModal({ booking, isOpen, onClose, onSave }: EditBooki
       setValue('phoneNumber', booking.phoneNumber);
       setValue('meetingTitle', booking.meetingTitle || '');
       setValue('roomId', booking.roomId);
+      setValue('department', booking.department || '');
+      setValue('needBreak', booking.needBreak ? 'true' : 'false');
+      setValue('breakDetails', booking.breakDetails || '');
+      setValue('breakOrganizer', booking.breakOrganizer || '');
       
       // Set booking dates and time slots
       if (booking.dates && booking.dates.length > 0) {
@@ -93,11 +101,16 @@ export function EditBookingModal({ booking, isOpen, onClose, onSave }: EditBooki
     setValue('dates', updatedDays.map(day => day.date));
   };
 
-  const onSubmit = async (data: BookingFormData) => {
+  const onSubmit = async (data: BookingFormInputData) => {
     setIsLoading(true);
     try {
-      // อัปเดตข้อมูลจาก bookingDays
-      data.dates = bookingDays.map(day => day.date);
+      // แปลง BookingFormInputData เป็น BookingFormData
+      const processedData: BookingFormData = {
+        ...data,
+        needBreak: data.needBreak === 'true',
+        dates: bookingDays.map(day => day.date),
+        timeSlot: bookingDays[0]?.timeSlot || 'morning'
+      };
       
       // Debug: แสดงข้อมูลที่กำลังจะส่ง
       console.log('EditBookingModal - Sending data:', {
@@ -106,7 +119,7 @@ export function EditBookingModal({ booking, isOpen, onClose, onSave }: EditBooki
         bookingDays: bookingDays
       });
       
-      await onSave(data);
+      await onSave(processedData);
       reset();
       onClose();
     } catch (error) {
@@ -158,18 +171,33 @@ export function EditBookingModal({ booking, isOpen, onClose, onSave }: EditBooki
 
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">
-                เบอร์โทรศัพท์ *
+                หน่วยงาน *
               </label>
               <input
-                type="tel"
-                {...register('phoneNumber', { required: 'กรุณากรอกเบอร์โทรศัพท์' })}
+                type="text"
+                {...register('department', { required: 'กรุณากรอกหน่วยงาน' })}
                 className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white/80 text-sm sm:text-base"
-                placeholder="08X-XXX-XXXX"
+                placeholder="เช่น สำนักงานเลขาธิการ"
               />
-              {errors.phoneNumber && (
-                <p className="mt-1 text-xs sm:text-sm text-red-600">{errors.phoneNumber.message}</p>
+              {errors.department && (
+                <p className="mt-1 text-xs sm:text-sm text-red-600">{errors.department.message}</p>
               )}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              เบอร์โทรศัพท์ *
+            </label>
+            <input
+              type="tel"
+              {...register('phoneNumber', { required: 'กรุณากรอกเบอร์โทรศัพท์' })}
+              className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white/80 text-sm sm:text-base"
+              placeholder="08X-XXX-XXXX"
+            />
+            {errors.phoneNumber && (
+              <p className="mt-1 text-xs sm:text-sm text-red-600">{errors.phoneNumber.message}</p>
+            )}
           </div>
 
           <div>
@@ -231,7 +259,7 @@ export function EditBookingModal({ booking, isOpen, onClose, onSave }: EditBooki
                         type="date"
                         value={day.date}
                         onChange={(e) => updateBookingDay(index, 'date', e.target.value)}
-                        min={new Date().toISOString().split('T')[0]}
+                        min={formatForInput(new Date())}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
                     </div>
@@ -267,6 +295,60 @@ export function EditBookingModal({ booking, isOpen, onClose, onSave }: EditBooki
                 </div>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              อาหารว่าง
+            </label>
+            <div className="space-y-2">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  value="true"
+                  {...register('needBreak')}
+                  className="mr-2"
+                />
+                รับ
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio" 
+                  value="false"
+                  {...register('needBreak')}
+                  className="mr-2"
+                />
+                ไม่รับ
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              หน่วยงานผู้จัดเบรค
+            </label>
+            <select
+              {...register('breakOrganizer')}
+              className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white/80 text-sm sm:text-base"
+            >
+              <option value="">เลือกหน่วยงานผู้จัดเบรค</option>
+              <option value="ฝปบ.">ฝปบ.</option>
+              <option value="กบษ.">กบษ.</option>
+              <option value="กปบ.">กปบ.</option>
+              <option value="กสฟ.">กสฟ.</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">
+              รายละเอียดอาหารที่ต้องการ
+            </label>
+            <textarea
+              {...register('breakDetails')}
+              rows={3}
+              className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white/80 text-sm sm:text-base"
+              placeholder="เช่น พักเที่ยง 12:00-13:00, ขนมและเครื่องดื่ม"
+            />
           </div>
 
           <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3 pt-4 sm:pt-6 border-t border-purple-100">

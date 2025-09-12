@@ -19,6 +19,8 @@ export interface Booking {
   timeSlot: 'morning' | 'afternoon' | 'full_day';
   needBreak: boolean;
   breakDetails?: string;
+  breakOrganizer?: string; // หน่วยงานผู้จัดเบรค
+  department: string; // หน่วยงานผู้จอง
   status: 'pending' | 'approved' | 'rejected' | 'cancelled';
   createdAt: string;
   updatedAt: string;
@@ -67,10 +69,47 @@ export interface BookingFormData {
   timeSlot: TimeSlot;
   needBreak: boolean;
   breakDetails?: string;
+  breakOrganizer?: string; // หน่วยงานผู้จัดเบรค
+  department: string; // หน่วยงานผู้จอง
   dates: string[];
 }
 
 export interface ApprovalData {
   adminId: number;
   reason?: string;
+}
+
+// Daily Overview Types
+export interface DailyMeeting {
+  id: number;
+  bookingCode: string;
+  timeSlot: TimeSlot;
+  roomName: string;
+  roomId: number;
+  capacity?: number;
+  meetingTitle: string;
+  bookerName: string;
+  phoneNumber: string;
+  needBreak: boolean;
+  breakDetails?: string;
+  breakOrganizer?: string; // หน่วยงานผู้จัดเบรค
+  department: string; // หน่วยงานผู้จอง
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  dates: string[];
+  createdAt: string;
+}
+
+export interface DailyStats {
+  totalMeetings: number;
+  roomsInUse: number;
+  totalRooms: number;
+  totalAttendees: number;
+  pendingApprovals: number;
+  breakRequests: number;
+}
+
+export interface DailyOverviewData {
+  date: string;
+  meetings: DailyMeeting[];
+  stats: DailyStats;
 }

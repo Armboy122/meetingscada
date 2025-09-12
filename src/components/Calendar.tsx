@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
-import { th } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useBookings } from '../hooks/useBookings';
-import { cn } from '../lib/utils';
+import { cn, formatMonthYear } from '../lib/utils';
+import { BookingListModal } from './BookingListModal';
 import type { Booking } from '../types';
 
 interface CalendarProps {
@@ -14,6 +14,8 @@ interface CalendarProps {
 
 export function Calendar({ selectedRoomId, onDateClick, onBookingClick }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [isBookingListModalOpen, setIsBookingListModalOpen] = useState(false);
   const { data: bookings = [] } = useBookings({ roomId: selectedRoomId });
 
   const monthStart = startOfMonth(currentDate);
@@ -170,7 +172,7 @@ export function Calendar({ selectedRoomId, onDateClick, onBookingClick }: Calend
       {/* Calendar Header */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg md:text-2xl font-semibold text-slate-800">
-          {format(currentDate, 'MMMM yyyy', { locale: th })}
+          {formatMonthYear(currentDate)}
         </h2>
         <div className="flex space-x-1">
           <button
@@ -212,12 +214,13 @@ export function Calendar({ selectedRoomId, onDateClick, onBookingClick }: Calend
               const availableSlots = getAvailableTimeSlots(day);
               const dayBookings = getBookingsForDate(day);
               
-              if (availableSlots.length > 0) {
-                // ถ้ายังมีช่วงเวลาว่าง ให้เปิดฟอร์มจองใหม่
+              if (dayBookings.length > 0) {
+                // ถ้ามีการจอง ให้แสดงรายการการจองทั้งหมด
+                setSelectedDate(day);
+                setIsBookingListModalOpen(true);
+              } else if (availableSlots.length > 0) {
+                // ถ้าไม่มีการจองและยังมีช่วงเวลาว่าง ให้เปิดฟอร์มจองใหม่
                 onDateClick(day);
-              } else if (dayBookings.length > 0) {
-                // ถ้าเต็มแล้ว ให้แสดงรายละเอียดการจองแรก
-                onBookingClick(dayBookings[0]);
               } else {
                 // ถ้าไม่มีการจอง ให้เปิดฟอร์มจอง
                 onDateClick(day);
@@ -249,6 +252,26 @@ export function Calendar({ selectedRoomId, onDateClick, onBookingClick }: Calend
           <span className="text-slate-700 font-bold">🔴 เต็ม</span>
         </div>
       </div>
+
+      <BookingListModal
+        date={selectedDate}
+        bookings={bookings}
+        isOpen={isBookingListModalOpen}
+        onClose={() => {
+          setIsBookingListModalOpen(false);
+          setSelectedDate(null);
+        }}
+        onBookingClick={(booking) => {
+          setIsBookingListModalOpen(false);
+          setSelectedDate(null);
+          onBookingClick(booking);
+        }}
+        onNewBooking={(date) => {
+          setIsBookingListModalOpen(false);
+          setSelectedDate(null);
+          onDateClick(date);
+        }}
+      />
     </div>
   );
 }

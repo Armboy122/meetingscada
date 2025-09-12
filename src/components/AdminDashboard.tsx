@@ -1,22 +1,24 @@
 import { useState } from 'react';
-import { ArrowLeft, Check, X, Edit, Eye, Trash2, Building, Users, Key } from 'lucide-react';
+import { ArrowLeft, Check, X, Edit, Eye, Trash2, Building, Users, Key, Filter, Search, Calendar, Clock, RotateCcw } from 'lucide-react';
 import { useBookings, useApproveBooking, useRejectBooking, useUpdateBooking, useDeleteBooking } from '../hooks/useBookings';
+import { useRooms } from '../hooks/useRooms';
 import { useAuth } from '../contexts/AuthContext';
 import { EditBookingModal } from './EditBookingModal';
 import { ChangePasswordModal } from './ChangePasswordModal';
 import { formatDate, getTimeSlotLabel, getStatusLabel, getStatusColor } from '../lib/utils';
-import type { Booking, BookingFormData } from '../types';
+import type { Booking, BookingFormData, DailyMeeting } from '../types';
 
 // Import new components
 import { RoomManagement } from './RoomManagement';
 import { AdminManagement } from './AdminManagement';
+import { DailyOverview } from './DailyOverview';
 // import { HistoryReports } from './HistoryReports'; // ปิดไว้ก่อน - API ยังไม่พร้อม
 
 interface AdminDashboardProps {
   onBack: () => void;
 }
 
-type AdminTab = 'bookings' | 'rooms' | 'admins'; // | 'reports'; // ปิดไว้ก่อน - API ยังไม่พร้อม
+type AdminTab = 'bookings' | 'daily-overview' | 'rooms' | 'admins'; // | 'reports'; // ปิดไว้ก่อน - API ยังไม่พร้อม
 
 export function AdminDashboard({ onBack }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('bookings');
@@ -29,13 +31,41 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
   const [rejectReason, setRejectReason] = useState('');
   const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
 
-  const { data: bookings = [], refetch } = useBookings({ status: selectedStatus });
-  const { data: allBookings = [], refetch: refetchAll } = useBookings({}); // ดึงข้อมูลทั้งหมดสำหรับ count
+  // Filter states
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedRoomId, setSelectedRoomId] = useState<number | undefined>(undefined);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
+  const [searchName, setSearchName] = useState('');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+
+  const { data: bookings = [] } = useBookings({ 
+    status: selectedStatus,
+    roomId: selectedRoomId,
+    timeSlot: selectedTimeSlot || undefined,
+    searchName: searchName || undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined
+  });
+  const { data: allBookings = [] } = useBookings({}); // ดึงข้อมูลทั้งหมดสำหรับ count
+  const { data: rooms = [] } = useRooms(); // ดึงข้อมูลห้องทั้งหมดสำหรับฟิลเตอร์
   const { admin: currentUser, loading: authLoading } = useAuth(); // ใช้ current user จาก Auth Context
   const approveBooking = useApproveBooking();
   const rejectBooking = useRejectBooking();
   const updateBooking = useUpdateBooking();
   const deleteBooking = useDeleteBooking();
+
+  // ฟังก์ชันสำหรับรีเซ็ตฟิลเตอร์
+  const resetFilters = () => {
+    setSelectedRoomId(undefined);
+    setSelectedTimeSlot('');
+    setSearchName('');
+    setDateFrom('');
+    setDateTo('');
+  };
+
+  // ตรวจสอบว่ามีฟิลเตอร์ใช้งานอยู่หรือไม่
+  const hasActiveFilters = selectedRoomId || selectedTimeSlot || searchName || dateFrom || dateTo;
 
   // ฟังก์ชันสำหรับหา admin ที่ active (ใช้ current user)
   const getActiveAdminId = () => {
@@ -47,6 +77,44 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
 
   // ตรวจสอบว่าเป็น Super Admin หรือไม่ (ใช้ current user)
   const isSuperAdmin = currentUser?.username === 'armoff122' && currentUser?.isActive;
+
+  // Helper functions for DailyOverview
+  const handleDailyMeetingSelect = (meeting: DailyMeeting) => {
+    // Convert DailyMeeting to Booking for compatibility
+    const booking: Booking = {
+      ...meeting,
+      updatedAt: meeting.createdAt, // Add missing field
+      room: rooms.find(r => r.id === meeting.roomId)
+    };
+    setSelectedBooking(booking);
+  };
+
+  const handleDailyApprove = async (meeting: DailyMeeting) => {
+    const booking: Booking = {
+      ...meeting,
+      updatedAt: meeting.createdAt,
+      room: rooms.find(r => r.id === meeting.roomId)
+    };
+    await handleApprove(booking);
+  };
+
+  const handleDailyReject = async (meeting: DailyMeeting) => {
+    const booking: Booking = {
+      ...meeting,
+      updatedAt: meeting.createdAt,
+      room: rooms.find(r => r.id === meeting.roomId)
+    };
+    await handleReject(booking);
+  };
+
+  const handleDailyEdit = (meeting: DailyMeeting) => {
+    const booking: Booking = {
+      ...meeting,
+      updatedAt: meeting.createdAt,
+      room: rooms.find(r => r.id === meeting.roomId)
+    };
+    handleEdit(booking);
+  };
 
   const handleApprove = async (booking: Booking) => {
     setSelectedBooking(booking);
@@ -78,10 +146,11 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
       await deleteBooking.mutateAsync(selectedBooking.id);
       setShowDeleteConfirm(false);
       setSelectedBooking(null);
-      refetch();
-      refetchAll();
+      // Optimistic updates will handle the UI changes, no need for manual refetch
     } catch (error) {
       console.error('Error deleting booking:', error);
+      // Error handling could be improved with toast notifications
+      alert('เกิดข้อผิดพลาดในการลบข้อมูล กรุณาลองใหม่อีกครั้ง');
     }
   };
 
@@ -95,8 +164,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
       });
       setShowEditModal(false);
       setSelectedBooking(null);
-      refetch();
-      refetchAll();
+      // Let React Query handle cache updates automatically
     } catch (error) {
       console.error('Error updating booking:', error);
       throw error;
@@ -128,8 +196,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
       }
       setShowModal(false);
       setSelectedBooking(null);
-      refetch();
-      refetchAll();
+      // React Query will handle cache invalidation automatically
     } catch (error) {
       console.error('Error processing booking:', error);
       // แสดง error message ที่เป็นประโยชน์
@@ -147,6 +214,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
 
   const adminTabs = [
     { key: 'bookings', label: 'จัดการการจอง', icon: Check, count: allBookings.filter(b => b.status === 'pending').length },
+    { key: 'daily-overview', label: 'ภาพรวมรายวัน', icon: Calendar },
     { key: 'rooms', label: 'จัดการห้องประชุม', icon: Building },
     ...(isSuperAdmin ? [{ key: 'admins', label: 'จัดการผู้ดูแล', icon: Users }] : []),
     // { key: 'reports', label: 'รายงานและประวัติ', icon: BarChart3 }, // ปิดไว้ก่อน - API ยังไม่พร้อม
@@ -285,6 +353,135 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
               </div>
             </div>
 
+            {/* Filter Panel */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl border border-purple-100/50 mb-6 sm:mb-8">
+              {/* Filter Header */}
+              <div className="p-4 border-b border-purple-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Filter className="w-5 h-5 text-purple-600" />
+                    <span className="font-medium text-slate-700">ฟิลเตอร์ข้อมูล</span>
+                    {hasActiveFilters && (
+                      <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-medium">
+                        มีฟิลเตอร์ใช้งาน
+                      </span>
+                    )}
+                    <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">
+                      แสดง {bookings.length} จาก {allBookings.length} รายการ
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {hasActiveFilters && (
+                      <button
+                        onClick={resetFilters}
+                        className="flex items-center space-x-1 px-3 py-1.5 text-xs text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>รีเซ็ต</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setShowFilters(!showFilters)}
+                      className="flex items-center space-x-2 px-3 py-1.5 text-sm text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                    >
+                      <span>{showFilters ? 'ซ่อน' : 'แสดง'}ฟิลเตอร์</span>
+                      <div className={`transform transition-transform ${showFilters ? 'rotate-180' : ''}`}>
+                        <X className="w-4 h-4" />
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter Controls */}
+              {showFilters && (
+                <div className="p-4 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Search Name */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        <Search className="w-4 h-4 inline mr-1" />
+                        ชื่อผู้จอง
+                      </label>
+                      <input
+                        type="text"
+                        value={searchName}
+                        onChange={(e) => setSearchName(e.target.value)}
+                        placeholder="ค้นหาชื่อผู้จอง..."
+                        className="w-full px-3 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent text-sm"
+                      />
+                    </div>
+
+                    {/* Time Slot Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        <Clock className="w-4 h-4 inline mr-1" />
+                        ช่วงเวลา
+                      </label>
+                      <select
+                        value={selectedTimeSlot}
+                        onChange={(e) => setSelectedTimeSlot(e.target.value)}
+                        className="w-full px-3 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent text-sm"
+                      >
+                        <option value="">ทั้งหมด</option>
+                        <option value="morning">เช้า (08:00-12:00)</option>
+                        <option value="afternoon">บ่าย (13:00-17:00)</option>
+                        <option value="full_day">เต็มวัน (08:00-17:00)</option>
+                      </select>
+                    </div>
+
+                    {/* Room Filter - Placeholder for now */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        <Building className="w-4 h-4 inline mr-1" />
+                        ห้องประชุม
+                      </label>
+                      <select
+                        value={selectedRoomId || ''}
+                        onChange={(e) => setSelectedRoomId(e.target.value ? Number(e.target.value) : undefined)}
+                        className="w-full px-3 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent text-sm"
+                      >
+                        <option value="">ทั้งหมด</option>
+                        {rooms.filter(room => room.isActive).map(room => (
+                          <option key={room.id} value={room.id}>
+                            {room.roomName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Date From */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        <Calendar className="w-4 h-4 inline mr-1" />
+                        วันที่เริ่มต้น
+                      </label>
+                      <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        className="w-full px-3 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent text-sm"
+                      />
+                    </div>
+
+                    {/* Date To */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        <Calendar className="w-4 h-4 inline mr-1" />
+                        วันที่สิ้นสุด
+                      </label>
+                      <input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        className="w-full px-3 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Bookings List */}
             <div className="bg-white/90 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl border border-purple-100/50 overflow-hidden">
               {/* Mobile Cards View */}
@@ -322,7 +519,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                       
                       {/* ผู้จอง */}
                       <div className="text-sm text-slate-600">
-                        👤 {booking.bookerName}
+                        👤 {booking.bookerName} {booking.department && `(${booking.department})`}
                       </div>
                       
                       {/* เบอร์ผู้จอง */}
@@ -333,7 +530,12 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                       {/* ข้อมูลเบรค */}
                       {booking.needBreak && (
                         <div className="text-sm text-orange-600 font-medium">
-                          ☕ ต้องการเบรค{booking.breakDetails ? `: ${booking.breakDetails}` : ''}
+                          ☕ ต้องการเบรค{booking.breakOrganizer ? ` (${booking.breakOrganizer})` : ''}
+                          {booking.breakDetails && (
+                            <div className="text-xs text-orange-500 mt-1">
+                              {booking.breakDetails}
+                            </div>
+                          )}
                         </div>
                       )}
                       
@@ -402,7 +604,18 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                 ))}
                 {bookings.length === 0 && (
                   <div className="text-center py-12">
-                    <p className="text-slate-500 text-sm">ไม่มีข้อมูลการจอง</p>
+                    <div className="mb-4">
+                      <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 rounded-full flex items-center justify-center">
+                        <Search className="w-8 h-8 text-slate-400" />
+                      </div>
+                      <p className="text-slate-500 text-sm">
+                        {hasActiveFilters ? (
+                          <>ไม่พบข้อมูลที่ตรงกับเงื่อนไขการกรอง<br/><span className="text-xs">ลองปรับเปลี่ยนตัวกรองหรือรีเซ็ตเพื่อดูข้อมูลทั้งหมด</span></>
+                        ) : (
+                          'ไม่มีข้อมูลการจอง'
+                        )}
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -449,11 +662,18 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                         
                         {/* ผู้จอง */}
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-slate-900">👤 {booking.bookerName}</div>
+                          <div className="text-sm font-medium text-slate-900">
+                            👤 {booking.bookerName} {booking.department && `(${booking.department})`}
+                          </div>
                           <div className="text-sm text-slate-600">📞 {booking.phoneNumber}</div>
                           {booking.needBreak && (
                             <div className="text-xs text-orange-600 font-medium mt-1">
-                              ☕ ต้องการเบรค{booking.breakDetails ? `: ${booking.breakDetails}` : ''}
+                              ☕ ต้องการเบรค{booking.breakOrganizer ? ` (${booking.breakOrganizer})` : ''}
+                              {booking.breakDetails && (
+                                <div className="text-xs text-orange-500 mt-1">
+                                  {booking.breakDetails}
+                                </div>
+                              )}
                             </div>
                           )}
                         </td>
@@ -529,7 +749,18 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                 </table>
                 {bookings.length === 0 && (
                   <div className="text-center py-12">
-                    <p className="text-slate-500 text-lg">ไม่มีข้อมูลการจอง</p>
+                    <div className="mb-4">
+                      <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 rounded-full flex items-center justify-center">
+                        <Search className="w-8 h-8 text-slate-400" />
+                      </div>
+                      <p className="text-slate-500 text-lg">
+                        {hasActiveFilters ? (
+                          <>ไม่พบข้อมูลที่ตรงกับเงื่อนไขการกรอง<br/><span className="text-sm">ลองปรับเปลี่ยนตัวกรองหรือรีเซ็ตเพื่อดูข้อมูลทั้งหมด</span></>
+                        ) : (
+                          'ไม่มีข้อมูลการจอง'
+                        )}
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -537,6 +768,15 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
           </>
         )}
 
+        {activeTab === 'daily-overview' && (
+          <DailyOverview 
+            onMeetingSelect={handleDailyMeetingSelect}
+            onApprove={handleDailyApprove}
+            onReject={handleDailyReject}
+            onEdit={handleDailyEdit}
+          />
+        )}
+        
         {activeTab === 'rooms' && <RoomManagement />}
         {activeTab === 'admins' && isSuperAdmin && <AdminManagement />}
         {activeTab === 'admins' && !isSuperAdmin && (
@@ -563,7 +803,9 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                 </div>
                 <div className="text-sm sm:text-base">
                   <span className="font-bold text-slate-700">ผู้จอง:</span> 
-                  <span className="ml-1 sm:ml-2 text-slate-800">{selectedBooking.bookerName}</span>
+                  <span className="ml-1 sm:ml-2 text-slate-800">
+                    {selectedBooking.bookerName} {selectedBooking.department && `(${selectedBooking.department})`}
+                  </span>
                 </div>
                 <div className="text-sm sm:text-base">
                   <span className="font-bold text-slate-700">ห้องประชุม:</span> 
@@ -595,8 +837,13 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                   <div className="text-sm sm:text-base">
                     <span className="font-bold text-slate-700">ข้อมูลเบรค:</span> 
                     <span className="ml-1 sm:ml-2 text-orange-600 font-medium">
-                      ☕ ต้องการเบรค{selectedBooking.breakDetails ? ` - ${selectedBooking.breakDetails}` : ''}
+                      ☕ ต้องการเบรค{selectedBooking.breakOrganizer ? ` (${selectedBooking.breakOrganizer})` : ''}
                     </span>
+                    {selectedBooking.breakDetails && (
+                      <div className="ml-1 sm:ml-2 text-sm text-orange-500 mt-1">
+                        {selectedBooking.breakDetails}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

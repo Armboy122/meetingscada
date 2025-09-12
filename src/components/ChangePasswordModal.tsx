@@ -1,18 +1,14 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { X, Lock, Eye, EyeOff } from 'lucide-react';
 import { apiClient } from '../lib/api';
+import { changePasswordSchema, type ChangePasswordData } from '../schemas';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-}
-
-interface ChangePasswordForm {
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
 }
 
 export function ChangePasswordModal({ isOpen, onClose, onSuccess }: ChangePasswordModalProps) {
@@ -22,15 +18,13 @@ export function ChangePasswordModal({ isOpen, onClose, onSuccess }: ChangePasswo
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const { register, handleSubmit, formState: { errors }, reset, watch } = useForm<ChangePasswordForm>();
+  const { register, handleSubmit, formState: { errors }, reset, watch } = useForm<ChangePasswordData>({
+    resolver: zodResolver(changePasswordSchema)
+  });
 
   const newPassword = watch('newPassword');
 
-  const onSubmit = async (data: ChangePasswordForm) => {
-    if (data.newPassword !== data.confirmPassword) {
-      setError('รหัสผ่านใหม่ไม่ตรงกัน');
-      return;
-    }
+  const onSubmit = async (data: ChangePasswordData) => {
 
     setIsLoading(true);
     setError('');

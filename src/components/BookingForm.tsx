@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { X, Plus, Trash2, Check, ArrowLeft } from 'lucide-react';
 import { format, addDays } from 'date-fns';
-import { th } from 'date-fns/locale';
 import { useCreateBooking, useBookings } from '../hooks/useBookings';
 import { useRooms } from '../hooks/useRooms';
-import type { BookingFormData, TimeSlot } from '../types';
+import { bookingFormInputSchema, type BookingFormInputData, type BookingFormData } from '../schemas';
+import { formatDateLong, formatForInput } from '../lib/utils';
+import type { TimeSlot } from '../types';
 
 interface BookingFormProps {
   selectedDate: Date | null;
@@ -32,38 +34,21 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
   // ดึงข้อมูลการจองสำหรับห้องที่เลือก
   const { data: existingBookings = [] } = useBookings({ roomId: selectedRoomId });
 
-  const { register, handleSubmit, formState: { errors }, reset, watch, setValue } = useForm<BookingFormData>({
+  const { register, handleSubmit, formState: { errors }, reset, watch, setValue } = useForm<BookingFormInputData>({
+    resolver: zodResolver(bookingFormInputSchema),
     defaultValues: {
       roomId: selectedRoomId,
-      needBreak: false,
+      needBreak: 'false',
       dates: [],
+      department: '',
+      bookerName: '',
+      phoneNumber: '',
+      meetingTitle: '',
+      timeSlot: 'morning' as const,
     },
   });
 
   const needBreak = watch('needBreak');
-
-  // ฟังก์ชันหา default time slot ที่ยังว่าง
-  const getDefaultTimeSlot = (dateString: string): TimeSlot => {
-    if (isTimeSlotAvailableForDate(dateString, 'morning')) return 'morning';
-    if (isTimeSlotAvailableForDate(dateString, 'afternoon')) return 'afternoon';
-    if (isTimeSlotAvailableForDate(dateString, 'full_day')) return 'full_day';
-    return 'morning'; // fallback
-  };
-
-  // Initialize booking days when modal opens
-  useEffect(() => {
-    if (isOpen && selectedDate) {
-      const dateString = format(selectedDate, 'yyyy-MM-dd');
-      const initialDay: BookingDay = {
-        date: dateString,
-        timeSlot: getDefaultTimeSlot(dateString)
-      };
-      setBookingDays([initialDay]);
-      setValue('dates', [initialDay.date]);
-      setShowConfirmation(false);
-      setFormData(null);
-    }
-  }, [isOpen, selectedDate, setValue]);
 
   // Update roomId when selectedRoomId prop changes
   useEffect(() => {
@@ -71,7 +56,7 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
   }, [selectedRoomId, setValue]);
 
   // ตรวจสอบช่วงเวลาที่จองไปแล้วในวันที่เลือก
-  const getBookedTimeSlotsForDate = (dateString: string) => {
+  const getBookedTimeSlotsForDate = useCallback((dateString: string) => {
     const bookedSlots: string[] = [];
 
     existingBookings.forEach(booking => {
@@ -90,10 +75,10 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
     });
 
     return bookedSlots;
-  };
+  }, [existingBookings]);
 
   // ตรวจสอบว่าช่วงเวลาใดใช้ได้สำหรับวันที่กำหนด
-  const isTimeSlotAvailableForDate = (dateString: string, timeSlot: TimeSlot) => {
+  const isTimeSlotAvailableForDate = useCallback((dateString: string, timeSlot: TimeSlot) => {
     const bookedSlots = getBookedTimeSlotsForDate(dateString);
     
     if (bookedSlots.length === 0) return true;
@@ -115,7 +100,30 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
     if (timeSlot === 'afternoon' && hasAfternoon) return false;
 
     return true;
-  };
+  }, [getBookedTimeSlotsForDate]);
+
+  // ฟังก์ชันหา default time slot ที่ยังว่าง
+  const getDefaultTimeSlot = useCallback((dateString: string): TimeSlot => {
+    if (isTimeSlotAvailableForDate(dateString, 'morning')) return 'morning';
+    if (isTimeSlotAvailableForDate(dateString, 'afternoon')) return 'afternoon';
+    if (isTimeSlotAvailableForDate(dateString, 'full_day')) return 'full_day';
+    return 'morning'; // fallback
+  }, [isTimeSlotAvailableForDate]);
+
+  // Initialize booking days when modal opens
+  useEffect(() => {
+    if (isOpen && selectedDate) {
+      const dateString = format(selectedDate, 'yyyy-MM-dd');
+      const initialDay: BookingDay = {
+        date: dateString,
+        timeSlot: getDefaultTimeSlot(dateString)
+      };
+      setBookingDays([initialDay]);
+      setValue('dates', [initialDay.date]);
+      setShowConfirmation(false);
+      setFormData(null);
+    }
+  }, [isOpen, selectedDate, setValue, getDefaultTimeSlot]);
 
   // เพิ่มวันใหม่
   const addBookingDay = () => {
@@ -167,10 +175,17 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
   };
 
   // ฟังก์ชันสำหรับยืนยันการจอง
-  const handleFormSubmit = async (data: BookingFormData) => {
+  const handleFormSubmit = async (data: BookingFormInputData) => {
+    console.log('Form submitted with data:', data);
+    console.log('Booking days:', bookingDays);
     setSubmitError(null);
     
     try {
+      // ตรวจสอบว่ามี bookingDays
+      if (bookingDays.length === 0) {
+        throw new Error('กรุณาเลือกวันที่จอง');
+      }
+
       // ตรวจสอบว่าทุกวันที่เลือกช่วงเวลาใช้ได้
       for (const day of bookingDays) {
         if (!isTimeSlotAvailableForDate(day.date, day.timeSlot)) {
@@ -178,12 +193,19 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
         }
       }
 
-      // แปลงค่า needBreak เป็น boolean และเก็บข้อมูลฟอร์ม
-      const processedData = {
+      // แปลงค่า needBreak เป็น boolean และรวมหน่วยงานกับชื่อผู้จอง
+      const processedData: BookingFormData = {
         ...data,
-        needBreak: String(data.needBreak) === 'true'
+        bookerName: `${data.bookerName} (${data.department})`, // รวมหน่วยงานเข้ากับชื่อ
+        needBreak: data.needBreak === 'true',
+        timeSlot: bookingDays[0].timeSlot, // ใช้ timeSlot จาก bookingDays แทน
+        // ปรับ breakDetails ให้ใส่หน่วยงานจัดเบรคข้างหน้า
+        breakDetails: data.needBreak === 'true' && data.breakOrganizer 
+          ? `${data.breakOrganizer} ${data.breakDetails || ''}`.trim()
+          : data.breakDetails || ''
       };
       
+      console.log('Processed data:', processedData);
       setFormData(processedData);
       setShowConfirmation(true);
     } catch (error) {
@@ -267,7 +289,7 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">ชื่อผู้จอง</label>
-                    <p className="text-sm text-gray-900">{formData?.bookerName}</p>
+                    <p className="text-sm text-gray-900">{formData?.bookerName} ({formData?.department})</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">เบอร์โทรศัพท์</label>
@@ -282,7 +304,7 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">ห้องประชุม</label>
-                  <p className="text-sm text-gray-900">{getRoomName(formData?.roomId || 0)}</p>
+                  <p className="text-sm text-gray-900">{getRoomName(Number(formData?.roomId) || 0)}</p>
                 </div>
                 
                 <div>
@@ -291,7 +313,7 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
                     {bookingDays.map((day, index) => (
                       <div key={index} className="flex items-center space-x-2 p-2 bg-white rounded border">
                         <span className="text-sm font-medium text-gray-900">
-                          {format(new Date(day.date), 'dd MMMM yyyy', { locale: th })}
+                          {formatDateLong(day.date)}
                         </span>
                         <span className="text-sm text-gray-600">-</span>
                         <span className="text-sm text-blue-600 font-medium">
@@ -305,8 +327,19 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
                 <div>
                   <label className="block text-sm font-medium text-gray-700">อาหารว่าง</label>
                   <p className="text-sm text-gray-900">{formData?.needBreak ? 'รับ' : 'ไม่รับ'}</p>
-                  {formData?.needBreak && formData?.breakDetails && (
-                    <p className="text-sm text-gray-600 mt-1">รายละเอียด: {formData.breakDetails}</p>
+                  {formData?.needBreak && (
+                    <>
+                      {formData?.breakOrganizer && (
+                        <p className="text-sm text-blue-600 mt-1 font-medium">
+                          ผู้จัด: {formData.breakOrganizer}
+                        </p>
+                      )}
+                      {formData?.breakDetails && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          รายละเอียด: {formData.breakDetails}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -334,10 +367,24 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
           </div>
         ) : (
           // หน้าฟอร์มจอง
-          <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit(handleFormSubmit, (errors) => {
+            console.log('Form validation errors:', errors);
+            setSubmitError('กรุณากรอกข้อมูลให้ครบถ้วน');
+          })} className="space-y-4">
             {submitError && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-md">
                 <p className="text-sm text-red-600">{submitError}</p>
+              </div>
+            )}
+            
+            {Object.keys(errors).length > 0 && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-600 font-medium">กรุณาแก้ไขข้อผิดพลาดต่อไปนี้:</p>
+                <ul className="mt-2 text-sm text-red-600 list-disc list-inside">
+                  {Object.entries(errors).map(([key, error]) => (
+                    <li key={key}>{error?.message}</li>
+                  ))}
+                </ul>
               </div>
             )}
             
@@ -353,6 +400,21 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
               />
               {errors.bookerName && (
                 <p className="mt-1 text-sm text-red-600">{errors.bookerName.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                หน่วยงาน *
+              </label>
+              <input
+                type="text"
+                {...register('department', { required: 'กรุณากรอกหน่วยงาน' })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="เช่น สำนักงานเลขาธิการ"
+              />
+              {errors.department && (
+                <p className="mt-1 text-sm text-red-600">{errors.department.message}</p>
               )}
             </div>
 
@@ -397,7 +459,10 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
                 ห้องประชุม *
               </label>
               <select
-                {...register('roomId', { required: 'กรุณาเลือกห้องประชุม' })}
+                {...register('roomId', { 
+                  required: 'กรุณาเลือกห้องประชุม',
+                  valueAsNumber: true
+                })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">เลือกห้องประชุม</option>
@@ -456,7 +521,7 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
                             type="date"
                             value={day.date}
                             onChange={(e) => updateBookingDay(index, 'date', e.target.value)}
-                            min={format(new Date(), 'yyyy-MM-dd')}
+                            min={formatForInput(new Date())}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
@@ -540,16 +605,37 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
             </div>
 
             {String(needBreak) === 'true' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  รายละเอียดอาหารที่ต้องการ
-                </label>
-                <textarea
-                  {...register('breakDetails')}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="เช่น พักเที่ยง 12:00-13:00"
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    หน่วยงานผู้จัดเบรค *
+                  </label>
+                  <select
+                    {...register('breakOrganizer')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">เลือกหน่วยงานผู้จัดเบรค</option>
+                    <option value="ฝปบ.">ฝปบ.</option>
+                    <option value="กบษ.">กบษ.</option>
+                    <option value="กปบ.">กปบ.</option>
+                    <option value="กสฟ.">กสฟ.</option>
+                  </select>
+                  {errors.breakOrganizer && (
+                    <p className="mt-1 text-sm text-red-600">{errors.breakOrganizer.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    รายละเอียดอาหารที่ต้องการ
+                  </label>
+                  <textarea
+                    {...register('breakDetails')}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="เช่น พักเที่ยง 12:00-13:00, ขนมและเครื่องดื่ม"
+                  />
+                </div>
               </div>
             )}
 
@@ -563,10 +649,9 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
               </button>
               <button
                 type="submit"
-                disabled={bookingDays.length === 0}
                 className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
               >
-                ดูข้อมูลการจอง ({bookingDays.length} วัน)
+                จองห้องประชุม ({bookingDays.length} วัน)
               </button>
             </div>
           </form>
