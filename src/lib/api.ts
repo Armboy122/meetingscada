@@ -12,15 +12,16 @@ class APIClient {
   }
 
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('authToken');
+    // ตรวจสอบ token จากทั้ง localStorage และ sessionStorage
+    const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
-    
+
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    
+
     return headers;
   }
 
@@ -47,8 +48,13 @@ class APIClient {
 
         // Handle 401 Unauthorized - redirect to login
         if (response.status === 401) {
+          // ลบ token จากทั้งสอง storage
           localStorage.removeItem('authToken');
           localStorage.removeItem('adminData');
+          localStorage.removeItem('loginTimestamp');
+          sessionStorage.removeItem('authToken');
+          sessionStorage.removeItem('adminData');
+          sessionStorage.removeItem('loginTimestamp');
           window.location.href = '/';
           throw new Error('กรุณาเข้าสู่ระบบใหม่');
         }
