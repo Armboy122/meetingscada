@@ -11,7 +11,7 @@ export const bookingFormInputSchema = z.object({
   phoneNumber: z
     .string()
     .min(1, 'กรุณากรอกเบอร์โทรศัพท์')
-    .regex(/^[0-9]{9,10}$/, 'เบอร์โทรศัพท์ต้องเป็นตัวเลข 9-10 หลัก'),
+    .regex(/^(?:[0-9]{5}|[0-9]{9,10})$/, 'เบอร์โทรศัพท์ต้องเป็นตัวเลข 5 หลัก (ภายใน) หรือ 9-10 หลัก'),
   
   meetingTitle: z
     .string()

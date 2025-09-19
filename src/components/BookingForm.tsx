@@ -442,8 +442,8 @@ export function BookingForm({ selectedDate, selectedRoomId, isOpen, onClose, onS
                 {...register('phoneNumber', { 
                   required: 'กรุณากรอกเบอร์โทรศัพท์',
                   pattern: {
-                    value: /^[0-9]{10,}$/,
-                    message: 'เบอร์โทรศัพท์ต้องเป็นตัวเลข 10 หลักขึ้นไป'
+                  value: /^(\d{5}|\d{10,})$/,
+                  message: 'เบอร์โทรศัพท์ต้องเป็นตัวเลข 5 หลัก (เบอร์ภายใน) หรือ 10 หลักขึ้นไป'
                   }
                 })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
